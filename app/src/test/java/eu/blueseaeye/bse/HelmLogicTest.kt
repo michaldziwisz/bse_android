@@ -1,0 +1,88 @@
+package eu.blueseaeye.bse
+
+import eu.blueseaeye.bse.model.AppSettings
+import eu.blueseaeye.bse.model.CourseSource
+import eu.blueseaeye.bse.model.HelmMath
+import eu.blueseaeye.bse.model.HelmSnapshot
+import eu.blueseaeye.bse.model.TargetMode
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Test
+import java.util.Date
+
+class HelmLogicTest {
+
+    @Test
+    fun relativeCourseWrapsAcrossNorth() {
+        assertEquals(-20.0, HelmMath.relativeCourse(350.0, 10.0), 0.0001)
+        assertEquals(20.0, HelmMath.relativeCourse(10.0, 350.0), 0.0001)
+        assertEquals(0.0, HelmMath.relativeCourse(100.0, 100.0), 0.0001)
+    }
+
+    @Test
+    fun normalizedCourseStaysInRange() {
+        assertEquals(10.0, HelmMath.normalizedCourse(370.0), 0.0001)
+        assertEquals(350.0, HelmMath.normalizedCourse(-10.0), 0.0001)
+    }
+
+    @Test
+    fun deviceBaseUrlFromPlainHost() {
+        val s = AppSettings(deviceHost = "192.168.4.1")
+        assertEquals("http://192.168.4.1/api", s.deviceBaseUrl())
+    }
+
+    @Test
+    fun deviceBaseUrlFromFullUrlWithoutApi() {
+        val s = AppSettings(deviceHost = "http://10.0.0.5")
+        assertEquals("http://10.0.0.5/api", s.deviceBaseUrl())
+    }
+
+    @Test
+    fun deviceBaseUrlEmptyFallsBackToDefault() {
+        val s = AppSettings(deviceHost = "   ")
+        assertEquals("http://192.168.4.1/api", s.deviceBaseUrl())
+    }
+
+    @Test
+    fun clampCoercesOutOfRangeValues() {
+        val s = AppSettings(averageWindow = 99, readingRate = 5.0, errorRange = 200.0).clamped()
+        assertEquals(5, s.averageWindow)
+        assertEquals(50.0, s.readingRate, 0.0001)
+        assertEquals(60.0, s.errorRange, 0.0001)
+    }
+
+    @Test
+    fun displayedValueUsesCourseWhenNoTarget() {
+        val settings = AppSettings(target = TargetMode.NONE)
+        val snapshot = HelmSnapshot(course = 123.4, rudder = null, wind = null, fetchedAt = Date())
+        assertEquals(123, snapshot.displayedValue(settings))
+    }
+
+    @Test
+    fun displayedValueUsesDeviationWithTarget() {
+        val settings = AppSettings(target = TargetMode.COURSE, targetCourse = 100.0)
+        val snapshot = HelmSnapshot(course = 110.0, rudder = null, wind = null, fetchedAt = Date())
+        assertEquals(10, snapshot.displayedValue(settings))
+    }
+
+    @Test
+    fun accessibilitySummaryDescribesRudderSide() {
+        val settings = AppSettings(target = TargetMode.NONE)
+        val snapshot = HelmSnapshot(course = 90.0, rudder = -15.0, wind = 45.0, fetchedAt = Date())
+        val summary = snapshot.accessibilitySummary(settings)
+        assertEquals("Kurs 90 stopni, Ster 15 stopni lewo, Wiatr 45 stopni", summary)
+    }
+
+    @Test
+    fun courseSourceFromKeyDefaults() {
+        assertEquals(CourseSource.CGFA, CourseSource.fromKey("nieznane"))
+        assertEquals(CourseSource.HDG, CourseSource.fromKey("hdg"))
+    }
+
+    @Test
+    fun snapshotWithoutCourseHasNullDisplay() {
+        val settings = AppSettings(target = TargetMode.NONE)
+        val snapshot = HelmSnapshot(course = null, rudder = null, wind = null, fetchedAt = Date())
+        assertNull(snapshot.displayedValue(settings))
+    }
+}

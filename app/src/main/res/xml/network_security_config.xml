@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Odpowiednik iOS-owego NSAllowsLocalNetworking. Urządzenie BlueSeaEye pracuje
+  jako access point (domyślnie http://192.168.4.1) i udostępnia API po zwykłym
+  HTTP bez TLS. Adres urządzenia jest konfigurowalny, więc nie da się wpisać go
+  na sztywno jako domeny (Android nie obsługuje zakresów CIDR w domain-config).
+  Zezwalamy więc na ruch nieszyfrowany — aplikacja łączy się wyłącznie z
+  lokalnym urządzeniem w jego sieci Wi-Fi.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
