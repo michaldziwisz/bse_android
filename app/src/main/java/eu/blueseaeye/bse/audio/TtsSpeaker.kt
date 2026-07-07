@@ -21,6 +21,13 @@ import kotlin.coroutines.resume
  *    UIAccessibility.post(.announcement)); wtedy TalkBack/Jeshuo je odczytają.
  *  - TTS (synteza): mówi bezpośrednio przez TextToSpeech z ustawionym głosem,
  *    tempem i głośnością.
+ *
+ * SAMONAPRAWA: TextToSpeech to powiązanie z zewnętrzną usługą systemową
+ * (np. silnik Google). Po wielu godzinach pracy system potrafi ubić tę usługę
+ * albo powiązanie pada — wtedy engine.speak() cicho zwraca błąd i aplikacja
+ * milknie mimo że „działa”. Dlatego wykrywamy nieudaną wypowiedź i odbudowujemy
+ * silnik od zera, po czym ponawiamy komunikat raz. Kluczowe dla bezpieczeństwa
+ * niewidomego żeglarza: brak głosu = brak informacji o kursie/sterze.
  */
 class TtsSpeaker(private val context: Context) {
 
@@ -69,13 +76,13 @@ class TtsSpeaker(private val context: Context) {
         if (settings.readingOutput == ReadingOutputMode.ARIA) {
             postAccessibilityAnnouncement(text)
         } else {
-            speak(text, settings)
+            speakWithRecovery(text, settings)
         }
     }
 
     /** Komunikat krytyczny (utrata/przywrócenie połączenia) — zawsze mówiony głosem. */
     suspend fun announceCritical(text: String, settings: AppSettings) {
-        speak(text, settings)
+        speakWithRecovery(text, settings)
     }
 
     fun postAccessibilityAnnouncement(text: String) {
@@ -87,9 +94,26 @@ class TtsSpeaker(private val context: Context) {
         runCatching { accessibilityManager.sendAccessibilityEvent(event) }
     }
 
-    private suspend fun speak(text: String, settings: AppSettings) {
-        val engine = tts ?: return
-        if (!isReady) return
+    /**
+     * Mówi komunikat, a jeśli silnik jest martwy lub wypowiedź cicho się nie
+     * powiedzie — odbudowuje TextToSpeech i ponawia raz. Dzięki temu głos wraca
+     * sam, nawet gdy usługa TTS padła po godzinach.
+     */
+    private suspend fun speakWithRecovery(text: String, settings: AppSettings) {
+        if (speakOnce(text, settings)) return
+        if (reinitialize()) {
+            speakOnce(text, settings)
+        }
+    }
+
+    /**
+     * @return true jeśli wypowiedź wystartowała i dobiegła końca poprawnie;
+     *         false jeśli silnik był niedostępny lub zgłosił błąd (sygnał do
+     *         odbudowy silnika).
+     */
+    private suspend fun speakOnce(text: String, settings: AppSettings): Boolean {
+        val engine = tts ?: return false
+        if (!isReady) return false
 
         runCatching {
             val voice = settings.readingVoiceIdentifier?.let { id ->
@@ -107,21 +131,21 @@ class TtsSpeaker(private val context: Context) {
         val volume = (settings.readingVolume / 100.0).toFloat().coerceIn(0f, 1f)
         val timeoutMs = speechTimeoutMs(text, settings)
 
-        withTimeoutOrNull(timeoutMs) {
-            suspendCancellableCoroutine<Unit> { continuation ->
+        val outcome = withTimeoutOrNull(timeoutMs) {
+            suspendCancellableCoroutine<Boolean> { continuation ->
                 engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {}
                     override fun onDone(utteranceId: String?) {
-                        if (continuation.isActive) continuation.resume(Unit)
+                        if (continuation.isActive) continuation.resume(true)
                     }
 
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
-                        if (continuation.isActive) continuation.resume(Unit)
+                        if (continuation.isActive) continuation.resume(false)
                     }
 
                     override fun onError(utteranceId: String?, errorCode: Int) {
-                        if (continuation.isActive) continuation.resume(Unit)
+                        if (continuation.isActive) continuation.resume(false)
                     }
                 })
 
@@ -130,11 +154,44 @@ class TtsSpeaker(private val context: Context) {
                 }
                 val result = engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
                 if (result != TextToSpeech.SUCCESS && continuation.isActive) {
-                    continuation.resume(Unit)
+                    continuation.resume(false)
                 }
                 continuation.invokeOnCancellation { runCatching { engine.stop() } }
             }
         }
+
+        // Przekroczenie czasu (null) też traktujemy jako porażkę wartą odbudowy —
+        // zawieszony silnik nie odezwie się sam.
+        return outcome == true
+    }
+
+    /**
+     * Odbudowuje silnik TextToSpeech od zera i czeka (z limitem czasu) aż zgłosi
+     * gotowość. Wołane gdy wypowiedź zawiodła — najczęstsza przyczyna „ciszy po
+     * godzinach” na Androidzie.
+     */
+    private suspend fun reinitialize(): Boolean {
+        runCatching { tts?.stop() }
+        runCatching { tts?.shutdown() }
+        tts = null
+        isReady = false
+
+        return withTimeoutOrNull(REINIT_TIMEOUT_MS) {
+            suspendCancellableCoroutine<Boolean> { continuation ->
+                lateinit var engine: TextToSpeech
+                engine = TextToSpeech(appContext) { status ->
+                    val ok = status == TextToSpeech.SUCCESS
+                    isReady = ok
+                    if (ok) {
+                        runCatching { engine.language = Locale("pl", "PL") }
+                        SettingsStore.applyAvailableVoices(engine)
+                    }
+                    if (continuation.isActive) continuation.resume(ok)
+                }
+                tts = engine
+                continuation.invokeOnCancellation { runCatching { engine.shutdown() } }
+            }
+        } ?: false
     }
 
     /** Odwzorowanie procentowego tempa (50–400) na mnożnik TextToSpeech (~0.5–2.5). */
@@ -148,5 +205,9 @@ class TtsSpeaker(private val context: Context) {
         val rateFactor = maxOf(settings.readingRate / 150.0, 0.5)
         val seconds = (baseDuration / rateFactor).coerceIn(4.0, 20.0)
         return (seconds * 1000).toLong()
+    }
+
+    private companion object {
+        const val REINIT_TIMEOUT_MS = 5_000L
     }
 }
