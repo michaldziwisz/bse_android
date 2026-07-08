@@ -1,7 +1,9 @@
 package eu.blueseaeye.bse.audio
 
+import android.app.KeyguardManager
 import android.content.Context
 import android.os.Bundle
+import android.os.PowerManager
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.view.accessibility.AccessibilityEvent
@@ -34,6 +36,10 @@ class TtsSpeaker(private val context: Context) {
     private val appContext = context.applicationContext
     private val accessibilityManager =
         appContext.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+    private val keyguardManager =
+        appContext.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+    private val powerManager =
+        appContext.getSystemService(Context.POWER_SERVICE) as PowerManager
 
     @Volatile
     private var tts: TextToSpeech? = null
@@ -71,14 +77,26 @@ class TtsSpeaker(private val context: Context) {
     val screenReaderEnabled: Boolean
         get() = accessibilityManager.isEnabled && accessibilityManager.isTouchExplorationEnabled
 
-    /** Zwykły komunikat: w trybie ARIA idzie do czytnika, inaczej mówi syntezator. */
+    /**
+     * Zwykły komunikat. W trybie ARIA normalnie oddajemy głos czytnikowi ekranu
+     * (ogłoszenie dostępności). ALE gdy ekran jest zablokowany lub wygaszony,
+     * system tłumi ogłoszenia dostępności (czytnik nie ma aktywnego okna) — wtedy
+     * mowa znika, choć tony dalej grają. Dlatego w takiej sytuacji mówimy własnym
+     * syntezatorem, żeby odczyt steru nie milkł przy telefonie w kieszeni.
+     */
     suspend fun announce(text: String, settings: AppSettings) {
-        if (settings.readingOutput == ReadingOutputMode.ARIA) {
+        if (settings.readingOutput == ReadingOutputMode.ARIA && !isScreenInteractive()) {
+            speakWithRecovery(text, settings)
+        } else if (settings.readingOutput == ReadingOutputMode.ARIA) {
             postAccessibilityAnnouncement(text)
         } else {
             speakWithRecovery(text, settings)
         }
     }
+
+    /** Ekran włączony i odblokowany — wtedy czytnik ekranu realnie odczyta ogłoszenia. */
+    private fun isScreenInteractive(): Boolean =
+        powerManager.isInteractive && !keyguardManager.isKeyguardLocked
 
     /** Komunikat krytyczny (utrata/przywrócenie połączenia) — zawsze mówiony głosem. */
     suspend fun announceCritical(text: String, settings: AppSettings) {
