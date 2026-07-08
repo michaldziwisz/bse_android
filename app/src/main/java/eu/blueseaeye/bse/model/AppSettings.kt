@@ -33,7 +33,8 @@ data class AppSettings(
     val errorThreshold: Double = 1.0,
     val errorRange: Double = 30.0,
     val invertRudderAngle: Boolean = false,
-    val rudderAngleCorrection: Double = 0.0
+    val rudderAngleCorrection: Double = 0.0,
+    val autoResumeMode: AutoResumeMode = AutoResumeMode.NEVER
 ) {
     /**
      * Adres bazowy API urządzenia zbudowany z [deviceHost]. Akceptuje samo IP

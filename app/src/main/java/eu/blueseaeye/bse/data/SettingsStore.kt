@@ -40,6 +40,18 @@ class SettingsStore(context: Context) {
         }
     }
 
+    /**
+     * Trwały ślad tego, czy odczyt był włączony. Pozwala wznowić pracę po tym,
+     * jak system ubił proces w tle i wskrzesił foreground service — inaczej
+     * świeży proces stałby z odczytem wyłączonym i aplikacja milczałaby mimo że
+     * użytkownik wcześniej włączył odczyt.
+     */
+    var readingActive: Boolean
+        get() = prefs.getBoolean(KEY_READING_ACTIVE, false)
+        set(value) {
+            runCatching { prefs.edit().putBoolean(KEY_READING_ACTIVE, value).apply() }
+        }
+
     private fun persist(settings: AppSettings) {
         runCatching {
             prefs.edit().putString(KEY_SETTINGS, json.encodeToString(settings)).apply()
@@ -62,6 +74,7 @@ class SettingsStore(context: Context) {
     companion object {
         private const val PREFS_NAME = "bse.settings"
         private const val KEY_SETTINGS = "settings"
+        private const val KEY_READING_ACTIVE = "reading_active"
 
         /**
          * Wypełniane raz przez [applyAvailableVoices] gdy syntezator jest gotowy.

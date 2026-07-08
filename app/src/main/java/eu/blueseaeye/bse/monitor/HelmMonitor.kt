@@ -5,6 +5,7 @@ import eu.blueseaeye.bse.audio.TtsSpeaker
 import eu.blueseaeye.bse.data.SettingsStore
 import eu.blueseaeye.bse.model.AdministrationAction
 import eu.blueseaeye.bse.model.AppSettings
+import eu.blueseaeye.bse.model.AutoResumeMode
 import eu.blueseaeye.bse.model.HelmMath
 import eu.blueseaeye.bse.model.HelmSnapshot
 import eu.blueseaeye.bse.model.TargetMode
@@ -34,7 +35,8 @@ data class MonitorState(
     val lastAnnouncement: String = "",
     val errorMessage: String? = null,
     val adminMessage: String? = null,
-    val isBusy: Boolean = false
+    val isBusy: Boolean = false,
+    val lastCrashReason: String? = null
 )
 
 /**
@@ -90,18 +92,56 @@ class HelmMonitor(
         isSpeechActive = false
         speaker.stop()
         tonePlayer.stop()
+        settingsStore.readingActive = false
         _state.value = _state.value.copy(isPolling = false, isReadingEnabled = false)
     }
 
     fun toggleReading() {
         val enabled = !_state.value.isReadingEnabled
         _state.value = _state.value.copy(isReadingEnabled = enabled, errorMessage = null)
+        settingsStore.readingActive = enabled
         if (!enabled) {
             speechGeneration++
             isSpeechActive = false
             speaker.stop()
             tonePlayer.stop()
         }
+    }
+
+    /**
+     * Wznawia odczyt po ponownym starcie procesu, jeśli był włączony w chwili
+     * ubicia i użytkownik na to pozwolił w ustawieniach. [launchedFromService]
+     * mówi, czy proces wstał z wskrzeszenia foreground service (bez interakcji
+     * użytkownika) — decyduje o trybie BACKGROUND_ONLY.
+     */
+    fun resumeIfNeeded(launchedFromService: Boolean) {
+        if (_state.value.isReadingEnabled) return
+        if (!settingsStore.readingActive) return
+
+        when (settingsStore.current.autoResumeMode) {
+            AutoResumeMode.NEVER -> return
+            AutoResumeMode.BACKGROUND_ONLY -> if (!launchedFromService) return
+            AutoResumeMode.ALWAYS -> Unit
+        }
+
+        _state.value = _state.value.copy(isReadingEnabled = true)
+    }
+
+    /**
+     * Jeśli poprzednie uruchomienie zakończyło się crashem, udostępnia jego
+     * pełny opis (do pokazania i skopiowania do schowka) — twardy dowód
+     * przyczyny zamiast zgadywania. Dodatkowo mówi krótki komunikat głosem.
+     */
+    suspend fun reportPreviousCrashIfAny(reason: String?) {
+        val text = reason?.takeIf { it.isNotBlank() } ?: return
+        _state.value = _state.value.copy(lastCrashReason = text)
+        val spoken = "Uwaga. Poprzednim razem aplikacja zakończyła się niespodziewanie. Szczegóły są dostępne na ekranie Ster do skopiowania."
+        _state.value = _state.value.copy(lastAnnouncement = spoken)
+        speakCritical(spoken, settings)
+    }
+
+    fun clearCrashReason() {
+        _state.value = _state.value.copy(lastCrashReason = null)
     }
 
     fun holdCurrentCourse() {

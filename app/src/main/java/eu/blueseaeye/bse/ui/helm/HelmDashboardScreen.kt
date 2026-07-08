@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -22,7 +23,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -61,6 +64,20 @@ fun HelmDashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
+        state.lastCrashReason?.let { reason ->
+            CrashReportSection(
+                reason = reason,
+                onCopy = {
+                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
+                        as android.content.ClipboardManager
+                    clipboard.setPrimaryClip(
+                        android.content.ClipData.newPlainText("BSE — opis błędu", reason)
+                    )
+                },
+                onDismiss = { monitor.clearCrashReason() }
+            )
+        }
+
         if (state.isConnectionLost) {
             ConnectionWarningSection(onOpenSettings = {
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
@@ -129,6 +146,61 @@ fun HelmDashboardScreen(
                 fontFamily = FontFamily.Monospace,
                 style = MaterialTheme.typography.bodyMedium
             )
+        }
+    }
+}
+
+@Composable
+private fun CrashReportSection(
+    reason: String,
+    onCopy: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var copied by remember { mutableStateOf(false) }
+    Surface(
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = "Aplikacja zakończyła się niespodziewanie",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Text(
+                text = "Powód (do diagnozy): $reason",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onTertiaryContainer
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Button(
+                    onClick = {
+                        onCopy()
+                        copied = true
+                    },
+                    modifier = Modifier.semanticButton("Kopiuj do schowka. Kopiuje pełny opis błędu, aby wkleić go w wiadomości.")
+                ) {
+                    Text("Kopiuj do schowka")
+                }
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.semanticButton("OK, ukryj. Ukrywa informację o poprzednim zamknięciu aplikacji.")
+                ) {
+                    Text("OK, ukryj")
+                }
+            }
+            if (copied) {
+                Text(
+                    text = "Skopiowano do schowka.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+                )
+            }
         }
     }
 }

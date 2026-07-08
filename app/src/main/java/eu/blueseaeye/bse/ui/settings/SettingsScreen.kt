@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.blueseaeye.bse.data.SettingsStore
 import eu.blueseaeye.bse.model.AppSettings
+import eu.blueseaeye.bse.model.AutoResumeMode
 import eu.blueseaeye.bse.model.CourseSource
 import eu.blueseaeye.bse.model.ReadingOutputMode
 import eu.blueseaeye.bse.model.ToneWaveform
@@ -69,6 +70,26 @@ fun SettingsScreen(
         DataSourceSection(settingsStore, settings)
         Divider()
         AuxiliarySection(settingsStore, settings)
+        Divider()
+        AutoResumeSection(settingsStore, settings)
+    }
+}
+
+@Composable
+private fun AutoResumeSection(store: SettingsStore, settings: AppSettings) {
+    SettingsSection("Wznawianie po restarcie") {
+        PickerRow(
+            label = "Wznawianie odczytu",
+            options = AutoResumeMode.entries,
+            selected = settings.autoResumeMode,
+            optionTitle = { it.title },
+            onSelected = { mode -> store.update { it.copy(autoResumeMode = mode) } }
+        )
+        Text(
+            text = "Jeśli system ubije aplikację w tle podczas dłuższej pracy, po jej ponownym uruchomieniu odczyt jest domyślnie wyłączony — trzeba go włączyć przyciskiem. Ustaw „Zawsze przy starcie”, aby odczyt wracał sam, gdy był włączony przed zamknięciem. Ustaw „Tylko po wznowieniu w tle”, aby wracał sam wyłącznie wtedy, gdy to system wznowił aplikację bez Twojego udziału.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 

@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import eu.blueseaeye.bse.BseApplication
 import eu.blueseaeye.bse.MainActivity
 
 /**
@@ -29,7 +30,21 @@ class HelmForegroundService : Service() {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
-            else -> startAsForeground()
+            else -> {
+                startAsForeground()
+                // Gdy system wskrzesił usługę po ubiciu procesu (START_STICKY,
+                // intent == null), MainActivity się NIE odtworzyła, więc pętla
+                // monitora nie działa i aplikacja milczałaby mimo aktywnej
+                // usługi. Wznów monitor i — zależnie od ustawień użytkownika —
+                // odczyt. To domyka „ciszę po ubiciu procesu” na agresywnych
+                // systemach (Samsung One UI, Xiaomi HyperOS).
+                val relaunchedBySystem = intent == null
+                if (relaunchedBySystem) {
+                    val container = (application as BseApplication).container
+                    container.monitor.start()
+                    container.monitor.resumeIfNeeded(launchedFromService = true)
+                }
+            }
         }
         return START_STICKY
     }

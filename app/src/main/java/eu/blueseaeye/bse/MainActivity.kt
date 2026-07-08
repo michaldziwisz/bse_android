@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
+import eu.blueseaeye.bse.diagnostics.CrashReporter
 import eu.blueseaeye.bse.service.HelmForegroundService
 import eu.blueseaeye.bse.ui.RootScreen
 import eu.blueseaeye.bse.ui.theme.BseTheme
@@ -46,6 +47,15 @@ class MainActivity : ComponentActivity() {
         }
 
         container.monitor.start()
+
+        // Diagnostyka: jeśli poprzednie uruchomienie się wywaliło, pokaż i
+        // przeczytaj powód (do skopiowania). Potem ewentualne wznowienie odczytu
+        // po ubiciu procesu — zależnie od ustawienia użytkownika.
+        lifecycleScope.launch {
+            val reason = CrashReporter.consumeLastCrashReason(this@MainActivity)
+            container.monitor.reportPreviousCrashIfAny(reason)
+            container.monitor.resumeIfNeeded(launchedFromService = false)
+        }
 
         setContent {
             BseTheme {

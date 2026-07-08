@@ -56,6 +56,23 @@ enum class AdministrationAction(val path: String) {
     REBOOT("reboot")
 }
 
+/**
+ * Zachowanie odczytu po ponownym uruchomieniu aplikacji (gdy agresywny system —
+ * np. Samsung One UI, Xiaomi HyperOS — ubił proces w tle, a foreground service
+ * został wskrzeszony przez system). Domyślnie aplikacja NIC nie wznawia sama —
+ * czeka na świadome włączenie odczytu przyciskiem.
+ */
+enum class AutoResumeMode(val key: String, val title: String) {
+    NEVER("never", "Nie wznawiaj (domyślnie)"),
+    BACKGROUND_ONLY("background", "Tylko po wznowieniu w tle"),
+    ALWAYS("always", "Zawsze przy starcie");
+
+    companion object {
+        fun fromKey(key: String?): AutoResumeMode =
+            entries.firstOrNull { it.key == key } ?: NEVER
+    }
+}
+
 /** Opcja głosu syntezatora. */
 data class VoiceOption(
     val id: String,
