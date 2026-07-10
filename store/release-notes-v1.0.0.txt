@@ -1,0 +1,3 @@
+<pl-PL>
+Pierwsza wersja testowa aplikacji BlueSeaEye. Dostępny odczyt kursu, steru i kąta do wiatru z urządzenia BlueSeaEye przez Wi-Fi, z obsługą czytników ekranu (TalkBack, Jieshuo). Komunikaty głosowe, sygnały dźwiękowe odchylenia oraz tryb demonstracyjny bez sprzętu.
+</pl-PL>

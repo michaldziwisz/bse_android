@@ -19,7 +19,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "eu.blueseaeye.bse"
+        applicationId = "eu.blueseaeye.app"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

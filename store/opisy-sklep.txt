@@ -1,0 +1,65 @@
+=== KRÓTKI OPIS (Short description, max 80 znaków) ===
+Wersja 1 (75 znaków):
+Dostępny odczyt kursu, steru i wiatru z urządzenia BlueSeaEye — mową i tonami.
+
+Wersja 2 (69 znaków), gdyby wolisz krótszą:
+Mówiący odczyt danych ze steru dla żeglarzy niewidomych i słabowidzących.
+
+Wersja 3 (61 znaków):
+Dostępny asystent żeglarski — kurs, ster i wiatr głosem i tonem.
+
+--------------------------------------------------------------------
+
+=== PEŁNY OPIS (Full description, max 4000 znaków) ===
+
+BlueSeaEye (BSE) to w pełni dostępny asystent żeglarski, który odczytuje na
+bieżąco dane nawigacyjne z urządzenia BlueSeaEye i przekazuje je głosem oraz
+sygnałami dźwiękowymi. Aplikacja powstała z myślą o żeglarzach niewidomych i
+słabowidzących, dlatego dostępność jest jej najważniejszą cechą — obsługę
+zaprojektowano od podstaw pod czytniki ekranu TalkBack i Jieshuo.
+
+GŁÓWNE FUNKCJE
+
+• Odczyt na żywo kursu, odchylenia od kursu, położenia steru oraz kąta do
+  wiatru — prosto z urządzenia BlueSeaEye przez sieć Wi-Fi.
+• Komunikaty głosowe zgodne z tym, co pokazuje urządzenie: sama wartość bez
+  zbędnych słów, informacja o skręcie w lewo lub w prawo.
+• Sygnały dźwiękowe odchylenia — dyskretne tony informujące o zejściu z kursu
+  bez konieczności patrzenia na ekran, z opcją krótszych sygnałów.
+• Tryb odchylki od zadanego kąta do wiatru — utrzymuj wybrany kurs względem
+  wiatru z pomocą dźwięku i mowy.
+• Tryb demonstracyjny — wypróbuj aplikację i naucz się jej obsługi bez
+  podłączonego sprzętu, na przykładowych danych.
+
+DOSTĘPNOŚĆ NA PIERWSZYM MIEJSCU
+
+• Pełna obsługa czytników ekranu TalkBack oraz Jieshuo.
+• Czytelne etykiety, opisy i komunikaty na żywo dla każdego elementu.
+• Mowa działa również przy wygaszonym i zablokowanym ekranie, dzięki czemu
+  możesz trzymać telefon w kieszeni i słuchać wskazań.
+• Sterowanie tak proste, jak to możliwe — bez zbędnych ekranów i rozpraszaczy.
+
+DZIAŁANIE W TLE I BEZPIECZEŃSTWO
+
+• Odczyt kontynuowany jest w tle dzięki usłudze pierwszoplanowej z
+  powiadomieniem, więc aplikacja nie milknie w trakcie rejsu.
+• Powiadomienie o utracie połączenia z urządzeniem oraz automatyczne wznowienie
+  po jego przywróceniu.
+• Aplikacja odporna na wygaszanie procesu przez system — po restarcie potrafi
+  wznowić odczyt zgodnie z ustawieniami.
+
+PRYWATNOŚĆ
+
+Aplikacja nie zbiera i nie wysyła Twoich danych osobowych. Łączy się wyłącznie
+z Twoim urządzeniem BlueSeaEye w sieci lokalnej (lub, w trybie
+demonstracyjnym, z serwerem przykładowych danych). Wszystkie ustawienia
+pozostają na Twoim telefonie.
+
+WYMAGANIA
+
+• Urządzenie BlueSeaEye, z którym telefon łączy się przez Wi-Fi (do pełnego
+  działania). Tryb demonstracyjny działa bez sprzętu.
+• Android 8.0 lub nowszy.
+
+BlueSeaEye to narzędzie tworzone po to, by żegluga była dostępna dla każdego —
+niezależnie od wzroku.
