@@ -9,6 +9,10 @@
 app/build/
 build/
 *.apk
+*.aab
 *.keystore
 *.jks
 keystore.properties
+keys/
+release/
+RELEASE_*.md
