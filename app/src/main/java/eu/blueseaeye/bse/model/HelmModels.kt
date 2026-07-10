@@ -44,31 +44,42 @@ data class HelmSnapshot(
 
     fun currentValue(settings: AppSettings): Double? = when (settings.target) {
         TargetMode.NONE, TargetMode.COURSE -> course
+        TargetMode.WIND -> wind
     }
 
     fun targetValue(settings: AppSettings): Double? = when (settings.target) {
         TargetMode.NONE -> null
         TargetMode.COURSE -> settings.targetCourse
+        TargetMode.WIND -> settings.targetWind
     }
 
-    fun accessibilitySummary(settings: AppSettings): String {
-        val headingText = run {
-            val value = displayedValue(settings)
-            if (value != null) {
-                if (settings.target == TargetMode.COURSE) "Odchyłka od kursu $value stopni"
-                else "Kurs $value stopni"
-            } else {
-                if (settings.target == TargetMode.COURSE) "Odchyłka od kursu nieznana"
-                else "Kurs nieznany"
+    /**
+     * Komunikat odczytu składany DOKŁADNIE tak, jak wbudowany frontend
+     * urządzenia BlueSeaEye (main.js): sama liczba głównej wartości (kurs,
+     * odchyłka od kursu albo odchyłka od kąta do wiatru) bez etykiety słownej,
+     * a następnie ster jako „Prawo N" / „Lewo N" (bez słowa „Ster"). Elementy
+     * łączone przecinkiem. Zwraca pusty ciąg, gdy nie ma nic do powiedzenia
+     * (tryb wiatru bez danych o wietrze) — wywołujący pomija wtedy wypowiedź.
+     *
+     * Zgodność 1:1 z urządzeniem: przy braku wartości głównej w trybie kursu
+     * i odchyłki od kursu urządzenie mówi „Kurs nieznany" (nie ma osobnego
+     * komunikatu dla odchyłki). W trybie wiatru bez danych — na życzenie
+     * użytkownika NIC nie jest wypowiadane (cała wypowiedź pominięta, także ster).
+     */
+    fun spokenReading(settings: AppSettings): String {
+        val parts = mutableListOf<String>()
+        val value = displayedValue(settings)
+        if (value != null) {
+            parts.add("$value")
+        } else {
+            when (settings.target) {
+                TargetMode.NONE, TargetMode.COURSE -> parts.add("Kurs nieznany")
+                TargetMode.WIND -> return ""
             }
         }
-        val parts = mutableListOf(headingText)
         rudder?.let {
-            val side = if (it >= 0) "prawo" else "lewo"
-            parts.add("Ster ${abs(it.roundToInt())} stopni $side")
-        }
-        wind?.let {
-            parts.add("Wiatr ${it.roundToInt()} stopni")
+            val side = if (it > 0) "Prawo" else "Lewo"
+            parts.add("$side ${abs(it.roundToInt())}")
         }
         return parts.joinToString(", ")
     }

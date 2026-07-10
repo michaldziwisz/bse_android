@@ -275,11 +275,16 @@ private fun ControlsSection(
                         onClick = {
                             settingsStore.update { s ->
                                 when (mode) {
-                                    TargetMode.NONE -> s.copy(target = mode, targetCourse = null)
+                                    TargetMode.NONE -> s.copy(target = mode, targetCourse = null, targetWind = null)
                                     TargetMode.COURSE -> s.copy(
                                         target = mode,
                                         targetCourse = s.targetCourse
                                             ?: HelmMath.normalizedCourse(state.snapshot?.course ?: 0.0)
+                                    )
+                                    TargetMode.WIND -> s.copy(
+                                        target = mode,
+                                        targetWind = s.targetWind
+                                            ?: HelmMath.normalizedCourse(state.snapshot?.wind ?: 0.0)
                                     )
                                 }
                             }
@@ -308,6 +313,25 @@ private fun ControlsSection(
                     Text("Ustaw aktualny kurs")
                 }
             }
+
+            if (settings.target == TargetMode.WIND) {
+                NumericSettingRow(
+                    title = "Zadany kąt do wiatru",
+                    valueText = String.format("%03.0f°", settings.targetWind ?: 0.0),
+                    decrementLabel = "Zmniejsz zadany kąt do wiatru",
+                    incrementLabel = "Zwiększ zadany kąt do wiatru",
+                    hint = "Zmiana co 1 stopień.",
+                    onDecrement = { adjustTargetWind(settingsStore, state, -1.0) },
+                    onIncrement = { adjustTargetWind(settingsStore, state, 1.0) }
+                )
+                FilledTonalButton(
+                    onClick = monitor::holdCurrentWind,
+                    enabled = state.snapshot?.wind != null,
+                    modifier = Modifier.semanticButton("Ustaw aktualny kąt do wiatru. Zapisuje aktualny kąt do wiatru jako docelowy.")
+                ) {
+                    Text("Ustaw aktualny kąt do wiatru")
+                }
+            }
         }
     }
 }
@@ -320,5 +344,16 @@ private fun adjustTargetCourse(
     settingsStore.update { s ->
         val current = s.targetCourse ?: HelmMath.normalizedCourse(state.snapshot?.course ?: 0.0)
         s.copy(targetCourse = HelmMath.normalizedCourse(current + delta))
+    }
+}
+
+private fun adjustTargetWind(
+    settingsStore: SettingsStore,
+    state: eu.blueseaeye.bse.monitor.MonitorState,
+    delta: Double
+) {
+    settingsStore.update { s ->
+        val current = s.targetWind ?: HelmMath.normalizedCourse(state.snapshot?.wind ?: 0.0)
+        s.copy(targetWind = HelmMath.normalizedCourse(current + delta))
     }
 }

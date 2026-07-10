@@ -96,22 +96,30 @@ private fun AutoResumeSection(store: SettingsStore, settings: AppSettings) {
 @Composable
 private fun DeviceSection(store: SettingsStore, settings: AppSettings) {
     SettingsSection("Urządzenie") {
-        LabeledTextField(
-            value = settings.deviceHost,
-            onValueChange = { store.update { s -> s.copy(deviceHost = it) } },
-            label = "Adres urządzenia BlueSeaEye",
-            singleLine = true,
-            keyboardType = InputType.TYPE_TEXT_VARIATION_URI
-        )
-        OutlinedButton(
-            enabled = settings.deviceHost != AppSettings.DEFAULT_DEVICE_HOST,
-            onClick = { store.update { it.copy(deviceHost = AppSettings.DEFAULT_DEVICE_HOST) } },
-            modifier = Modifier.semanticButton("Przywróć domyślny adres")
-        ) {
-            Text("Przywróć domyślny adres")
+        ToggleRow("Tryb demonstracyjny", settings.demoMode) { v ->
+            store.update { it.copy(demoMode = v) }
+        }
+        if (!settings.demoMode) {
+            LabeledTextField(
+                value = settings.deviceHost,
+                onValueChange = { store.update { s -> s.copy(deviceHost = it) } },
+                label = "Adres urządzenia BlueSeaEye",
+                singleLine = true,
+                keyboardType = InputType.TYPE_TEXT_VARIATION_URI
+            )
+            OutlinedButton(
+                enabled = settings.deviceHost != AppSettings.DEFAULT_DEVICE_HOST,
+                onClick = { store.update { it.copy(deviceHost = AppSettings.DEFAULT_DEVICE_HOST) } },
+                modifier = Modifier.semanticButton("Przywróć domyślny adres")
+            ) {
+                Text("Przywróć domyślny adres")
+            }
         }
         Text(
-            text = "Połącz telefon z siecią Wi-Fi „BlueSeaEye” (hasło blueseaeye). Domyślny adres ${AppSettings.DEFAULT_DEVICE_HOST} odpowiada urządzeniu w trybie access pointa.",
+            text = if (settings.demoMode)
+                "Tryb demonstracyjny jest włączony. Aplikacja pobiera dane z serwera ${AppSettings.DEMO_BASE_URL} przez internet. Wyłącz go, aby łączyć się ze sprzętem w sieci Wi-Fi „BlueSeaEye”."
+            else
+                "Połącz telefon z siecią Wi-Fi „BlueSeaEye” (hasło blueseaeye). Domyślny adres ${AppSettings.DEFAULT_DEVICE_HOST} odpowiada urządzeniu w trybie access pointa.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -188,6 +196,9 @@ private fun ToneSection(store: SettingsStore, settings: AppSettings) {
         }
         ToggleRow("Odtwarzaj ton na zadanym kursie", settings.toneOnCourse) { v ->
             store.update { it.copy(toneOnCourse = v) }
+        }
+        ToggleRow("Krótsze sygnały", settings.shortTones) { v ->
+            store.update { it.copy(shortTones = v) }
         }
         ToggleRow("Szeroka rozpiętość tonów", settings.broadTonalSpread) { v ->
             store.update { it.copy(broadTonalSpread = v) }

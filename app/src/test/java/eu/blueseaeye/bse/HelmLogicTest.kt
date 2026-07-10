@@ -66,11 +66,47 @@ class HelmLogicTest {
     }
 
     @Test
-    fun accessibilitySummaryDescribesRudderSide() {
+    fun spokenReadingMatchesDeviceFormat() {
+        // 1:1 z urządzeniem: sama liczba kursu + ster jako „Lewo N" bez słowa
+        // „Ster", bez czytania wiatru w trybie kurs.
         val settings = AppSettings(target = TargetMode.NONE)
         val snapshot = HelmSnapshot(course = 90.0, rudder = -15.0, wind = 45.0, fetchedAt = Date())
-        val summary = snapshot.accessibilitySummary(settings)
-        assertEquals("Kurs 90 stopni, Ster 15 stopni lewo, Wiatr 45 stopni", summary)
+        assertEquals("90, Lewo 15", snapshot.spokenReading(settings))
+    }
+
+    @Test
+    fun spokenReadingRudderRightAndDeviation() {
+        val settings = AppSettings(target = TargetMode.COURSE, targetCourse = 100.0)
+        val snapshot = HelmSnapshot(course = 110.0, rudder = 5.0, wind = null, fetchedAt = Date())
+        assertEquals("10, Prawo 5", snapshot.spokenReading(settings))
+    }
+
+    @Test
+    fun spokenReadingCourseUnknownWhenNoValue() {
+        val settings = AppSettings(target = TargetMode.NONE)
+        val snapshot = HelmSnapshot(course = null, rudder = null, wind = null, fetchedAt = Date())
+        assertEquals("Kurs nieznany", snapshot.spokenReading(settings))
+    }
+
+    @Test
+    fun spokenReadingEmptyInWindModeWithoutWind() {
+        // Tryb wiatru bez danych o wietrze: nic nie jest wypowiadane (także ster).
+        val settings = AppSettings(target = TargetMode.WIND, targetWind = 30.0)
+        val snapshot = HelmSnapshot(course = 90.0, rudder = -15.0, wind = null, fetchedAt = Date())
+        assertEquals("", snapshot.spokenReading(settings))
+    }
+
+    @Test
+    fun windTargetModeUsesWindDeviation() {
+        val settings = AppSettings(target = TargetMode.WIND, targetWind = 40.0)
+        val snapshot = HelmSnapshot(course = 200.0, rudder = null, wind = 50.0, fetchedAt = Date())
+        assertEquals(10, snapshot.displayedValue(settings))
+    }
+
+    @Test
+    fun demoModeUsesDemoServer() {
+        val settings = AppSettings(demoMode = true, deviceHost = "192.168.4.1")
+        assertEquals(AppSettings.DEMO_BASE_URL, settings.deviceBaseUrl())
     }
 
     @Test

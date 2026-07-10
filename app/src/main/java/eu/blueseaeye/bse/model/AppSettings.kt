@@ -27,20 +27,30 @@ data class AppSettings(
     val toneOnCourse: Boolean = true,
     val toneType: ToneWaveform = ToneWaveform.TRIANGLE,
     val toneVolume: Double = 25.0,
+    val shortTones: Boolean = true,
     val broadTonalSpread: Boolean = false,
     val target: TargetMode = TargetMode.NONE,
     val targetCourse: Double? = null,
+    val targetWind: Double? = null,
     val errorThreshold: Double = 1.0,
     val errorRange: Double = 30.0,
     val invertRudderAngle: Boolean = false,
     val rudderAngleCorrection: Double = 0.0,
-    val autoResumeMode: AutoResumeMode = AutoResumeMode.NEVER
+    val autoResumeMode: AutoResumeMode = AutoResumeMode.NEVER,
+    val demoMode: Boolean = false
 ) {
     /**
      * Adres bazowy API urządzenia zbudowany z [deviceHost]. Akceptuje samo IP
      * lub nazwę hosta, a także pełny URL wpisany przez użytkownika.
+     *
+     * W trybie demonstracyjnym ([demoMode]) zwraca zawsze serwer demonstracyjny
+     * w internecie zamiast adresu sprzętu w sieci lokalnej — dzięki temu odczyt
+     * i akcje administracyjne działają bez łodzi i bez fizycznego urządzenia.
      */
     fun deviceBaseUrl(): String {
+        if (demoMode) {
+            return DEMO_BASE_URL
+        }
         val host = deviceHost.trim().ifEmpty { DEFAULT_DEVICE_HOST }
         val hasScheme = host.startsWith("http://", ignoreCase = true) ||
             host.startsWith("https://", ignoreCase = true)
@@ -65,6 +75,10 @@ data class AppSettings(
             val rounded = Math.round(it).toDouble()
             ((rounded % 360) + 360) % 360
         }
+        val normalizedTargetWind = targetWind?.let {
+            val rounded = Math.round(it).toDouble()
+            ((rounded % 360) + 360) % 360
+        }
         return copy(
             averageWindow = averageWindow.coerceIn(1, 5),
             readingDelay = readingDelay.coerceIn(0.0, 30.0),
@@ -77,7 +91,8 @@ data class AppSettings(
             errorThreshold = errorThreshold.coerceIn(1.0, 15.0),
             errorRange = errorRange.coerceIn(15.0, 60.0),
             rudderAngleCorrection = rudderAngleCorrection.coerceIn(-90.0, 90.0),
-            targetCourse = normalizedTarget
+            targetCourse = normalizedTarget,
+            targetWind = normalizedTargetWind
         )
     }
 
@@ -85,6 +100,13 @@ data class AppSettings(
         /** Domyślny host urządzenia BlueSeaEye w trybie access pointa (brama SoftAP). */
         const val DEFAULT_DEVICE_HOST = "192.168.4.1"
         const val FALLBACK_DEVICE_BASE_URL = "http://192.168.4.1/api"
+
+        /**
+         * Adres bazowy serwera demonstracyjnego BlueSeaEye. W trybie demo
+         * aplikacja łączy się z nim przez internet zamiast ze sprzętem w sieci
+         * lokalnej — pozwala testować bez łodzi i bez fizycznego urządzenia.
+         */
+        const val DEMO_BASE_URL = "https://blueseaeye.eu/api"
 
         val DEFAULT = AppSettings()
     }

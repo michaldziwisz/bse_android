@@ -151,6 +151,13 @@ class HelmMonitor(
         }
     }
 
+    fun holdCurrentWind() {
+        val wind = _state.value.snapshot?.wind ?: return
+        settingsStore.update {
+            it.copy(target = TargetMode.WIND, targetWind = normalized(wind))
+        }
+    }
+
     fun clearError() {
         _state.value = _state.value.copy(errorMessage = null)
     }
@@ -256,7 +263,10 @@ class HelmMonitor(
 
     private suspend fun readOut(snapshot: HelmSnapshot, settings: AppSettings) {
         try {
-            val text = announcement(snapshot, settings)
+            val text = snapshot.spokenReading(settings)
+            // Pusty komunikat = nie ma nic do powiedzenia (np. tryb wiatru bez
+            // danych o wietrze). Zgodnie z decyzją użytkownika NIC wtedy nie mówimy.
+            if (text.isEmpty()) return
             _state.value = _state.value.copy(lastAnnouncement = text)
             speakRegular(text, settings)
         } finally {
@@ -280,12 +290,34 @@ class HelmMonitor(
         settings: AppSettings
     ) {
         try {
-            val currentValue = snapshot.course ?: return
-            val targetValue = if (settings.target == TargetMode.COURSE) settings.targetCourse else null
+            val currentValue: Double?
+            val targetValue: Double?
+            val previousValue: Double?
+            when (settings.target) {
+                TargetMode.NONE -> {
+                    currentValue = snapshot.course
+                    targetValue = null
+                    previousValue = previousSnapshot?.course
+                }
+                TargetMode.COURSE -> {
+                    currentValue = snapshot.course
+                    targetValue = settings.targetCourse
+                    previousValue = previousSnapshot?.course
+                }
+                TargetMode.WIND -> {
+                    currentValue = snapshot.wind
+                    targetValue = settings.targetWind
+                    previousValue = previousSnapshot?.wind
+                }
+            }
+
+            // Brak wartości bieżącej (np. tryb wiatru bez czujnika wiatru na tym
+            // egzemplarzu urządzenia) => brak sygnału.
+            if (currentValue == null) return
 
             val delta = when {
                 targetValue != null -> HelmMath.relativeCourse(currentValue, targetValue)
-                previousSnapshot?.course != null -> HelmMath.relativeCourse(currentValue, previousSnapshot.course)
+                previousValue != null -> HelmMath.relativeCourse(currentValue, previousValue)
                 else -> return
             }
 
@@ -295,43 +327,33 @@ class HelmMonitor(
 
             if (!(errorExceeded || settings.toneOnCourse || !onTarget)) return
 
+            // Czasy trwania tonów zależą od ustawienia „Krótsze sygnały" —
+            // dokładnie jak w urządzeniu: ton referencyjny 80/160 ms, przerwa
+            // 20/40 ms, ton właściwy 100/200 ms.
+            val referenceToneDuration = if (settings.shortTones) 0.08 else 0.16
+            val referencePauseMs = if (settings.shortTones) 20L else 40L
+            val mainToneDuration = if (settings.shortTones) 0.1 else 0.2
+
             if (errorExceeded || (!onTarget && delta != 0.0)) {
                 val compensatedDelta = absoluteDelta - (if (onTarget) settings.errorThreshold else 0.0)
                 val severity = minOf(compensatedDelta, settings.errorRange)
                 val gain = if (delta > 0) 1.0 else -1.0
                 val multiplier = if (settings.broadTonalSpread) 2.0 else 1.0
                 if (settings.referenceTone) {
-                    tonePlayer.play(frequencyMid, 0.08, settings.toneVolume / 100.0, settings.toneType)
-                    delay(20)
+                    tonePlayer.play(frequencyMid, referenceToneDuration, settings.toneVolume / 100.0, settings.toneType)
+                    delay(referencePauseMs)
                 }
                 val baseOffset = settings.toneBaseOffset / 12.0
                 val frequency = frequencyMid * 2.0.pow(
                     gain * ((multiplier * severity / settings.errorRange) + baseOffset)
                 )
-                tonePlayer.play(frequency, 0.1, settings.toneVolume / 100.0, settings.toneType)
+                tonePlayer.play(frequency, mainToneDuration, settings.toneVolume / 100.0, settings.toneType)
             } else {
-                tonePlayer.play(frequencyMid, 0.1, settings.toneVolume / 100.0, settings.toneType)
+                tonePlayer.play(frequencyMid, mainToneDuration, settings.toneVolume / 100.0, settings.toneType)
             }
         } finally {
             isSignalInProgress = false
         }
-    }
-
-    private fun announcement(snapshot: HelmSnapshot, settings: AppSettings): String {
-        val parts = mutableListOf<String>()
-        val value = snapshot.displayedValue(settings)
-        val mainText = if (value != null) {
-            if (settings.target == TargetMode.COURSE) "Odchyłka $value" else "Kurs $value"
-        } else {
-            if (settings.target == TargetMode.COURSE) "Odchyłka nieznana" else "Kurs nieznany"
-        }
-        parts.add(mainText)
-        snapshot.rudder?.let {
-            val side = if (it >= 0) "prawo" else "lewo"
-            parts.add("Ster $side ${abs(it.roundToInt())}")
-        }
-        snapshot.wind?.let { parts.add("Wiatr ${it.roundToInt()}") }
-        return parts.joinToString(", ")
     }
 
     private suspend fun <T> retrying(times: Int, operation: suspend () -> T): T {

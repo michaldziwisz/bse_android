@@ -35,7 +35,8 @@ fun CompassCard(
     val displayed = snapshot?.displayedValue(settings)
     val valueText = if (displayed != null) String.format("%03d", abs(displayed)) else "?"
     val prefix = if (displayed != null && displayed < 0) "-" else ""
-    val summary = snapshot?.accessibilitySummary(settings) ?: "Brak bieżących odczytów"
+    val summary = snapshot?.spokenReading(settings)?.takeIf { it.isNotEmpty() }
+        ?: "Brak bieżących odczytów"
 
     Surface(
         modifier = modifier
