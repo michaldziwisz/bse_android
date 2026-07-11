@@ -259,14 +259,23 @@ fun AdjustableSettingRow(
 
                     private fun applyRange(info: android.view.accessibility.AccessibilityNodeInfo) {
                         val current = valueLabel(valueForTick(progress))
-                        // Kolejność: TalkBack czyta stateDescription PRZED
-                        // contentDescription. Chcemy „nazwa, wartość", więc całą
-                        // frazę dajemy w contentDescription, a stateDescription
-                        // czyścimy — inaczej (a) słychać wartość przed nazwą oraz
-                        // (b) ProgressBar wstawia tam „N%".
+                        // Samsung TalkBack dolicza „N procent" dla KAŻDEJ kontrolki
+                        // rozpoznanej jako SeekBar/ProgressBar (z progress/max),
+                        // niezależnie od RangeInfo/stateDescription/contentDescription.
+                        // Dlatego podajemy klasę zwykłego View — wtedy nie jest
+                        // traktowana jak pasek postępu i procent znika. Aby gest
+                        // regulacji góra/dół dalej działał, RĘCZNIE dodajemy akcje
+                        // przewijania do węzła (ich obsługę realizuje delegat niżej).
+                        info.className = android.view.View::class.java.name
                         info.rangeInfo = null
                         info.stateDescription = ""
                         info.contentDescription = "$label $current"
+                        if (progress < ticks) {
+                            info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD)
+                        }
+                        if (progress > 0) {
+                            info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD)
+                        }
                     }
                 }.apply {
                     this.max = ticks
