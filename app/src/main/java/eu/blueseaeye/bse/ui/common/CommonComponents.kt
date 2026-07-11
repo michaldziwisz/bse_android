@@ -189,14 +189,20 @@ private fun hintedLabel(label: String, hint: String?): String =
 
 /**
  * „Wybieracz" wartości oparty o natywny android.widget.SeekBar. Czytnik ekranu
- * (TalkBack ORAZ Jeshuo) obsługuje go gestem jednym palcem góra/dół, zmieniając
- * wartość o jeden krok — SeekBar to standardowa kontrolka regulowana, więc oba
- * czytniki radzą sobie z nią pewnie (czysta semantyka Compose bywa zawodna pod
- * Jeshuo, dlatego natywna kontrolka).
+ * (TalkBack ORAZ Jeshuo) obsługuje go gestem jednym palcem góra/dół — SeekBar to
+ * standardowa kontrolka regulowana, więc oba czytniki radzą sobie z nią pewnie
+ * (czysta semantyka Compose bywa zawodna pod Jeshuo, dlatego natywna kontrolka).
  *
  * Operuje na wartościach zmiennoprzecinkowych; [step] to wielkość jednego kroku.
- * Nazwa idzie jako contentDescription, a bieżąca wartość jako stateDescription
- * (czytnik mówi np. „Mów co, 5 sekund, suwak").
+ *
+ * DWA ważne szczegóły dostępności:
+ *  1. Cała fraza („Mów co 5 s") idzie jako contentDescription, a NIE dzielona na
+ *     contentDescription+stateDescription — inaczej TalkBack czyta stan przed
+ *     nazwą („5 s, Mów co"). stateDescription celowo NIE jest ustawiane.
+ *  2. Natywny AbsSeekBar obsługuje akcje przewijania czytnika (SCROLL_FORWARD/
+ *     BACKWARD) skacząc o max/20 zamiast o jeden krok — dlatego „stopnie chodzą
+ *     co ileś". Podmieniamy AccessibilityDelegate i przewijamy DOKŁADNIE o 1
+ *     krok (1 gest = 1 krok).
  */
 @Composable
 fun AdjustableSettingRow(
@@ -211,6 +217,7 @@ fun AdjustableSettingRow(
 ) {
     val ticks = Math.max(1, Math.round((max - min) / step).toInt())
     val currentTick = Math.round((value - min) / step).toInt().coerceIn(0, ticks)
+    fun spoken(tick: Int): String = "$label ${valueLabel(min + tick * step)}"
 
     Column(modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -232,38 +239,61 @@ fun AdjustableSettingRow(
             factory = { ctx ->
                 android.widget.SeekBar(ctx).apply {
                     this.max = ticks
+                    keyProgressIncrement = 1
                     progress = currentTick
-                    contentDescription = label
-                    setStateDescriptionCompat(valueLabel(value))
+                    // Cała fraza jako jedna nazwa (kolejność: nazwa, potem wartość).
+                    contentDescription = spoken(currentTick)
+
+                    // Zmiana wartości przez użytkownika (dotyk paska lub nasze akcje
+                    // dostępności) — aktualizujemy model i nazwę.
                     setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
                         override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
-                            val newValue = min + progress * step
-                            sb.setStateDescriptionCompat(valueLabel(newValue))
+                            sb.contentDescription = spoken(progress)
                             if (fromUser && getTag(R.id.labeled_text_field_self_update) != true) {
-                                onValueChange(newValue)
+                                onValueChange(min + progress * step)
                             }
                         }
                         override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
                         override fun onStopTrackingTouch(sb: android.widget.SeekBar) {}
                     })
+
+                    // Przechwytujemy akcje przewijania czytnika, żeby przesuwać o
+                    // DOKŁADNIE jeden krok (natywny AbsSeekBar skacze o max/20).
+                    androidx.core.view.ViewCompat.setAccessibilityDelegate(
+                        this,
+                        object : androidx.core.view.AccessibilityDelegateCompat() {
+                            override fun performAccessibilityAction(
+                                host: android.view.View,
+                                action: Int,
+                                args: android.os.Bundle?
+                            ): Boolean {
+                                val sb = host as android.widget.SeekBar
+                                val forward = action ==
+                                    androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_FORWARD.id
+                                val backward = action ==
+                                    androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_BACKWARD.id
+                                if (forward || backward) {
+                                    val next = (sb.progress + if (forward) 1 else -1).coerceIn(0, ticks)
+                                    if (next != sb.progress) {
+                                        sb.progress = next // uruchamia listener -> onValueChange + nazwa
+                                    }
+                                    return true
+                                }
+                                return super.performAccessibilityAction(host, action, args)
+                            }
+                        }
+                    )
                 }
             },
             update = { sb ->
-                sb.contentDescription = label
                 if (sb.max != ticks) sb.max = ticks
                 if (sb.progress != currentTick) {
                     sb.setTag(R.id.labeled_text_field_self_update, true)
                     sb.progress = currentTick
                     sb.setTag(R.id.labeled_text_field_self_update, false)
                 }
-                sb.setStateDescriptionCompat(valueLabel(value))
+                sb.contentDescription = spoken(currentTick)
             }
         )
-    }
-}
-
-private fun android.view.View.setStateDescriptionCompat(text: String) {
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-        stateDescription = text
     }
 }
