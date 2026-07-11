@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.lifecycleScope
 import eu.blueseaeye.bse.diagnostics.CrashReporter
+import eu.blueseaeye.bse.model.AppSettings
 import eu.blueseaeye.bse.service.HelmForegroundService
 import eu.blueseaeye.bse.ui.RootScreen
 import eu.blueseaeye.bse.ui.theme.BseTheme
@@ -31,6 +32,9 @@ class MainActivity : ComponentActivity() {
         requestNotificationPermissionIfNeeded()
 
         // Ekran nie gaśnie w trakcie aktywnego odczytu (odpowiednik isIdleTimerDisabled).
+        // Dodatkowo, gdy odczyt trwa, przypinamy ruch aplikacji do sieci Wi-Fi
+        // urządzenia BlueSeaEye, żeby system nie przełączył nas na inną
+        // zapamiętaną sieć (np. statkowy internet) w środku żeglugi.
         lifecycleScope.launch {
             container.monitor.state
                 .map { it.isReadingEnabled }
@@ -39,9 +43,17 @@ class MainActivity : ComponentActivity() {
                     if (reading) {
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         HelmForegroundService.start(this@MainActivity)
+                        val settings = container.settingsStore.current
+                        if (settings.keepDeviceWifi && !settings.demoMode) {
+                            container.deviceNetworkBinder.start(
+                                AppSettings.DEVICE_WIFI_SSID,
+                                AppSettings.DEVICE_WIFI_PASSPHRASE
+                            )
+                        }
                     } else {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         HelmForegroundService.stop(this@MainActivity)
+                        container.deviceNetworkBinder.stop()
                     }
                 }
         }

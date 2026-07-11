@@ -5,6 +5,7 @@ import eu.blueseaeye.bse.audio.TonePlayer
 import eu.blueseaeye.bse.audio.TtsSpeaker
 import eu.blueseaeye.bse.data.SettingsStore
 import eu.blueseaeye.bse.monitor.HelmMonitor
+import eu.blueseaeye.bse.network.DeviceNetworkBinder
 import eu.blueseaeye.bse.network.HelmApiClient
 import eu.blueseaeye.bse.service.SafetyNotifications
 
@@ -21,6 +22,7 @@ class AppContainer(context: Context) {
     private val tonePlayer = TonePlayer()
     private val apiClient = HelmApiClient()
     val notifications = SafetyNotifications(appContext)
+    val deviceNetworkBinder = DeviceNetworkBinder(appContext)
 
     val monitor = HelmMonitor(
         settingsStore = settingsStore,

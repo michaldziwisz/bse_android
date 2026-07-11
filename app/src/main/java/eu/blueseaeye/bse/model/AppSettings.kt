@@ -37,7 +37,8 @@ data class AppSettings(
     val invertRudderAngle: Boolean = false,
     val rudderAngleCorrection: Double = 0.0,
     val autoResumeMode: AutoResumeMode = AutoResumeMode.NEVER,
-    val demoMode: Boolean = false
+    val demoMode: Boolean = false,
+    val keepDeviceWifi: Boolean = true
 ) {
     /**
      * Adres bazowy API urządzenia zbudowany z [deviceHost]. Akceptuje samo IP
@@ -107,6 +108,10 @@ data class AppSettings(
          * lokalnej — pozwala testować bez łodzi i bez fizycznego urządzenia.
          */
         const val DEMO_BASE_URL = "https://blueseaeye.eu/api"
+
+        /** SSID i hasło access pointa urządzenia BlueSeaEye (tryb SoftAP). */
+        const val DEVICE_WIFI_SSID = "BlueSeaEye"
+        const val DEVICE_WIFI_PASSPHRASE = "blueseaeye"
 
         val DEFAULT = AppSettings()
     }

@@ -123,6 +123,16 @@ private fun DeviceSection(store: SettingsStore, settings: AppSettings) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        if (!settings.demoMode) {
+            ToggleRow("Trzymaj się sieci urządzenia", settings.keepDeviceWifi) { v ->
+                store.update { it.copy(keepDeviceWifi = v) }
+            }
+            Text(
+                text = "Gdy włączone, w trakcie odczytu aplikacja przypina swój ruch do sieci Wi-Fi „BlueSeaEye”, aby telefon nie przełączył się na inną sieć (np. statkowy internet), gdy ta chwilowo złapie lepszy zasięg. Przy pierwszym użyciu system poprosi o zgodę na połączenie z siecią urządzenia.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
