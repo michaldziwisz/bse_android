@@ -262,6 +262,17 @@ fun AdjustableSettingRow(
                     androidx.core.view.ViewCompat.setAccessibilityDelegate(
                         this,
                         object : androidx.core.view.AccessibilityDelegateCompat() {
+                            override fun onInitializeAccessibilityNodeInfo(
+                                host: android.view.View,
+                                info: androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+                            ) {
+                                super.onInitializeAccessibilityNodeInfo(host, info)
+                                // SeekBar dokleja własny procent (np. „99 procent")
+                                // z RangeInfo — zerujemy je, bo wartość jest już w
+                                // nazwie („Mów co 5 s", „Zadany kurs 045°”).
+                                info.rangeInfo = null
+                            }
+
                             override fun performAccessibilityAction(
                                 host: android.view.View,
                                 action: Int,
