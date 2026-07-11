@@ -40,8 +40,7 @@ import eu.blueseaeye.bse.model.ReadingOutputMode
 import eu.blueseaeye.bse.model.TargetMode
 import eu.blueseaeye.bse.data.SettingsStore
 import eu.blueseaeye.bse.monitor.HelmMonitor
-import eu.blueseaeye.bse.ui.common.NumericSettingRow
-import eu.blueseaeye.bse.ui.common.SectionHeaderText
+import eu.blueseaeye.bse.ui.common.AdjustableSettingRow
 import eu.blueseaeye.bse.ui.common.semanticButton
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -231,14 +230,14 @@ private fun ControlsSection(
             }
 
             if (settings.target == TargetMode.COURSE) {
-                NumericSettingRow(
-                    title = "Zadany kurs",
-                    valueText = String.format("%03.0f°", settings.targetCourse ?: 0.0),
-                    decrementLabel = "Zmniejsz zadany kurs",
-                    incrementLabel = "Zwiększ zadany kurs",
-                    hint = "Zmiana co 1 stopień.",
-                    onDecrement = { adjustTargetCourse(settingsStore, state, -1.0) },
-                    onIncrement = { adjustTargetCourse(settingsStore, state, 1.0) }
+                AdjustableSettingRow(
+                    label = "Zadany kurs",
+                    value = settings.targetCourse ?: 0.0,
+                    min = 0.0,
+                    max = 359.0,
+                    step = 1.0,
+                    valueLabel = { String.format("%03.0f°", it) },
+                    onValueChange = { setTargetCourse(settingsStore, it) }
                 )
                 FilledTonalButton(
                     onClick = monitor::holdCurrentCourse,
@@ -252,13 +251,8 @@ private fun ControlsSection(
     }
 }
 
-private fun adjustTargetCourse(
-    settingsStore: SettingsStore,
-    state: eu.blueseaeye.bse.monitor.MonitorState,
-    delta: Double
-) {
+private fun setTargetCourse(settingsStore: SettingsStore, value: Double) {
     settingsStore.update { s ->
-        val current = s.targetCourse ?: HelmMath.normalizedCourse(state.snapshot?.course ?: 0.0)
-        s.copy(targetCourse = HelmMath.normalizedCourse(current + delta))
+        s.copy(targetCourse = HelmMath.normalizedCourse(value))
     }
 }
