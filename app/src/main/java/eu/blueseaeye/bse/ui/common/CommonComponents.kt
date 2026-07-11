@@ -259,40 +259,33 @@ fun AdjustableSettingRow(
 
                     private fun applyRange(info: android.view.accessibility.AccessibilityNodeInfo) {
                         val current = valueLabel(valueForTick(progress))
-                        // Samsung TalkBack dolicza „N procent" dla KAŻDEJ kontrolki
-                        // rozpoznanej jako SeekBar/ProgressBar (z progress/max),
-                        // niezależnie od RangeInfo/stateDescription/contentDescription.
-                        // Dlatego podajemy klasę zwykłego View — wtedy nie jest
-                        // traktowana jak pasek postępu i procent znika. Aby gest
-                        // regulacji góra/dół dalej działał, RĘCZNIE dodajemy akcje
-                        // przewijania do węzła (ich obsługę realizuje delegat niżej).
-                        info.className = android.view.View::class.java.name
+                        // Klasa ZOSTAJE SeekBar — dzięki temu działa natywny gest
+                        // regulacji góra/dół (zmiana na View go zabija). Procent
+                        // znika, bo: (a) rangeInfo=null, (b) stateDescription jest
+                        // NIEPUSTA — Samsung TalkBack używa jej zamiast liczyć „N%".
+                        // Całą frazę „Zadany kurs 359" dajemy w stateDescription
+                        // (czytnik czyta ją PRZED contentDescription), a
+                        // contentDescription czyścimy, żeby nie dublować i mieć
+                        // kolejność „nazwa, wartość".
                         info.rangeInfo = null
-                        info.stateDescription = ""
-                        info.contentDescription = "$label $current"
-                        if (progress < ticks) {
-                            info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD)
-                        }
-                        if (progress > 0) {
-                            info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD)
-                        }
+                        info.contentDescription = ""
+                        info.stateDescription = "$label $current"
                     }
                 }.apply {
                     this.max = ticks
                     keyProgressIncrement = 1
                     progress = currentTick
-                    // Nazwa niesie całą frazę „nazwa wartość"; stateDescription
-                    // czyścimy, żeby TalkBack nie czytał wartości przed nazwą ani
-                    // procentu (patrz applyRange).
-                    contentDescription = "$label ${valueLabel(valueForTick(currentTick))}"
-                    setStateDescriptionCompat("")
+                    // Wartość (z nazwą) idzie w stateDescription; contentDescription
+                    // czyścimy — patrz applyRange (procent i kolejność).
+                    contentDescription = ""
+                    setStateDescriptionCompat("$label ${valueLabel(valueForTick(currentTick))}")
 
                     // Zmiana wartości przez użytkownika (dotyk paska lub nasze akcje
                     // dostępności) — aktualizujemy model i wartość dla czytnika.
                     setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
                         override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
-                            sb.contentDescription = "$label ${valueLabel(valueForTick(progress))}"
-                            sb.setStateDescriptionCompat("")
+                            sb.contentDescription = ""
+                            sb.setStateDescriptionCompat("$label ${valueLabel(valueForTick(progress))}")
                             if (fromUser && getTag(R.id.labeled_text_field_self_update) != true) {
                                 onValueChange(min + progress * step)
                             }
@@ -336,8 +329,8 @@ fun AdjustableSettingRow(
                     sb.progress = currentTick
                     sb.setTag(R.id.labeled_text_field_self_update, false)
                 }
-                sb.contentDescription = "$label ${valueLabel(valueForTick(currentTick))}"
-                sb.setStateDescriptionCompat("")
+                sb.contentDescription = ""
+                sb.setStateDescriptionCompat("$label ${valueLabel(valueForTick(currentTick))}")
             }
         )
     }
