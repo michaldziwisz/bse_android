@@ -239,6 +239,11 @@ fun AdjustableSettingRow(
     }
 
     var showKeyboardDialog by remember { mutableStateOf(false) }
+    // Tick, który sami wysłaliśmy do modelu i na którego „echo" ze store czekamy.
+    // Podczas odczytu DataStore commituje asynchronicznie, a burza rekompozycji
+    // (napływające snapshoty) potrafi wpisać STARĄ wartość z powrotem do suwaka —
+    // dlatego dopóki echo nie dojdzie, ignorujemy przychodzące wartości.
+    val pendingTick = remember { mutableStateOf<Int?>(null) }
 
     Column(modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -291,6 +296,14 @@ fun AdjustableSettingRow(
                         info.rangeInfo = null
                         info.contentDescription = ""
                         info.stateDescription = "$label $current"
+                        // Przy wrap=true zawsze udostępniamy OBIE akcje przewijania,
+                        // także na krańcach — inaczej AbsSeekBar usuwa
+                        // SCROLL_FORWARD przy max i SCROLL_BACKWARD przy 0, więc
+                        // czytnik nie ma czego wysłać i zawijanie nie działa.
+                        if (wrap) {
+                            info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_FORWARD)
+                            info.addAction(android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_BACKWARD)
+                        }
                         // Gdy dozwolone wpisanie z klawiatury — dwukrotne stuknięcie
                         // (ACTION_CLICK) otwiera pole tekstowe. Podpowiedź dla
                         // czytnika, że da się kliknąć.
@@ -313,14 +326,29 @@ fun AdjustableSettingRow(
                     contentDescription = ""
                     setStateDescriptionCompat("$label ${valueLabel(valueForTick(currentTick))}")
 
-                    // Zmiana wartości przez użytkownika (dotyk paska lub nasze akcje
-                    // dostępności) — aktualizujemy model i wartość dla czytnika.
+                    // Zatwierdza nowy tick: zapamiętuje go jako „w locie" (żeby
+                    // asynchroniczne echo ze store nie cofnęło suwaka podczas
+                    // odczytu), ustawia pozycję i zgłasza zmianę do modelu.
+                    fun commitTick(nextTick: Int) {
+                        pendingTick.value = nextTick
+                        if (progress != nextTick) {
+                            setTag(R.id.labeled_text_field_self_update, true)
+                            progress = nextTick
+                            setTag(R.id.labeled_text_field_self_update, false)
+                        }
+                        contentDescription = ""
+                        setStateDescriptionCompat("$label ${valueLabel(valueForTick(nextTick))}")
+                        onValueChange(valueForTick(nextTick))
+                    }
+
+                    // Dotyk paska przez użytkownika — aktualizujemy model i wartość.
                     setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
                         override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
                             sb.contentDescription = ""
                             sb.setStateDescriptionCompat("$label ${valueLabel(valueForTick(progress))}")
                             if (fromUser && getTag(R.id.labeled_text_field_self_update) != true) {
-                                onValueChange(min + progress * step)
+                                pendingTick.value = progress
+                                onValueChange(valueForTick(progress))
                             }
                         }
                         override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
@@ -345,10 +373,7 @@ fun AdjustableSettingRow(
                                 val backward = action ==
                                     androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_BACKWARD.id
                                 if (forward || backward) {
-                                    val next = nextTick(sb.progress, forward)
-                                    if (next != sb.progress) {
-                                        sb.progress = next // uruchamia listener -> onValueChange + nazwa
-                                    }
+                                    commitTick(nextTick(sb.progress, forward))
                                     return true
                                 }
                                 if (allowKeyboardInput &&
@@ -365,13 +390,32 @@ fun AdjustableSettingRow(
             },
             update = { sb ->
                 if (sb.max != ticks) sb.max = ticks
-                if (sb.progress != currentTick) {
-                    sb.setTag(R.id.labeled_text_field_self_update, true)
-                    sb.progress = currentTick
-                    sb.setTag(R.id.labeled_text_field_self_update, false)
+                // Echo z modelu. Jeśli czekamy na własną zmianę (pendingTick), a
+                // przyszła wartość jeszcze jej nie odzwierciedla, NIE cofamy suwaka
+                // — inaczej podczas odczytu asynchroniczny zapis cofałby pozycję.
+                val pending = pendingTick.value
+                when {
+                    pending != null && currentTick == pending -> {
+                        pendingTick.value = null // echo doszło, zwalniamy blokadę
+                        if (sb.progress != currentTick) {
+                            sb.setTag(R.id.labeled_text_field_self_update, true)
+                            sb.progress = currentTick
+                            sb.setTag(R.id.labeled_text_field_self_update, false)
+                        }
+                    }
+                    pending != null -> {
+                        // wciąż czekamy na echo — zostaw pozycję użytkownika
+                    }
+                    else -> {
+                        if (sb.progress != currentTick) {
+                            sb.setTag(R.id.labeled_text_field_self_update, true)
+                            sb.progress = currentTick
+                            sb.setTag(R.id.labeled_text_field_self_update, false)
+                        }
+                    }
                 }
                 sb.contentDescription = ""
-                sb.setStateDescriptionCompat("$label ${valueLabel(valueForTick(currentTick))}")
+                sb.setStateDescriptionCompat("$label ${valueLabel(valueForTick(sb.progress))}")
             }
         )
     }
