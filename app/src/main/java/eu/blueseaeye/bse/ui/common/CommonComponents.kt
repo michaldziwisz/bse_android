@@ -9,14 +9,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
@@ -24,6 +32,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import eu.blueseaeye.bse.R
@@ -213,11 +223,22 @@ fun AdjustableSettingRow(
     step: Double,
     valueLabel: (Double) -> String,
     onValueChange: (Double) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    wrap: Boolean = false,
+    allowKeyboardInput: Boolean = false
 ) {
     val ticks = Math.max(1, Math.round((max - min) / step).toInt())
     val currentTick = Math.round((value - min) / step).toInt().coerceIn(0, ticks)
     fun valueForTick(tick: Int): Double = min + tick * step
+    // Zawijanie: krok w górę z ostatniego ticka wraca na 0, a w dół z 0 skacze
+    // na ostatni. Bez zawijania — zwykłe ograniczenie do zakresu.
+    fun nextTick(from: Int, forward: Boolean): Int {
+        val raw = from + if (forward) 1 else -1
+        return if (wrap) ((raw % (ticks + 1)) + (ticks + 1)) % (ticks + 1)
+        else raw.coerceIn(0, ticks)
+    }
+
+    var showKeyboardDialog by remember { mutableStateOf(false) }
 
     Column(modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -270,6 +291,18 @@ fun AdjustableSettingRow(
                         info.rangeInfo = null
                         info.contentDescription = ""
                         info.stateDescription = "$label $current"
+                        // Gdy dozwolone wpisanie z klawiatury — dwukrotne stuknięcie
+                        // (ACTION_CLICK) otwiera pole tekstowe. Podpowiedź dla
+                        // czytnika, że da się kliknąć.
+                        if (allowKeyboardInput) {
+                            info.isClickable = true
+                            info.addAction(
+                                android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction(
+                                    android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK,
+                                    "wpisz wartość z klawiatury"
+                                )
+                            )
+                        }
                     }
                 }.apply {
                     this.max = ticks
@@ -295,7 +328,9 @@ fun AdjustableSettingRow(
                     })
 
                     // Przechwytujemy akcje przewijania czytnika, żeby przesuwać o
-                    // DOKŁADNIE jeden krok (natywny AbsSeekBar skacze o max/20).
+                    // DOKŁADNIE jeden krok (natywny AbsSeekBar skacze o max/20), a
+                    // przy wrap=true zawijać przez granicę zakresu. Dwukrotne
+                    // stuknięcie (ACTION_CLICK) otwiera dialog z klawiaturą.
                     androidx.core.view.ViewCompat.setAccessibilityDelegate(
                         this,
                         object : androidx.core.view.AccessibilityDelegateCompat() {
@@ -310,10 +345,16 @@ fun AdjustableSettingRow(
                                 val backward = action ==
                                     androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_SCROLL_BACKWARD.id
                                 if (forward || backward) {
-                                    val next = (sb.progress + if (forward) 1 else -1).coerceIn(0, ticks)
+                                    val next = nextTick(sb.progress, forward)
                                     if (next != sb.progress) {
                                         sb.progress = next // uruchamia listener -> onValueChange + nazwa
                                     }
+                                    return true
+                                }
+                                if (allowKeyboardInput &&
+                                    action == androidx.core.view.accessibility.AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK.id
+                                ) {
+                                    showKeyboardDialog = true
                                     return true
                                 }
                                 return super.performAccessibilityAction(host, action, args)
@@ -334,6 +375,61 @@ fun AdjustableSettingRow(
             }
         )
     }
+
+    if (showKeyboardDialog) {
+        CourseInputDialog(
+            label = label,
+            initial = Math.round(value).toInt(),
+            min = Math.round(min).toInt(),
+            max = Math.round(max).toInt(),
+            onConfirm = { entered ->
+                showKeyboardDialog = false
+                onValueChange(entered.toDouble())
+            },
+            onDismiss = { showKeyboardDialog = false }
+        )
+    }
+}
+
+@Composable
+private fun CourseInputDialog(
+    label: String,
+    initial: Int,
+    min: Int,
+    max: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var text by remember { mutableStateOf(initial.toString()) }
+    val parsed = text.trim().toIntOrNull()
+    val valid = parsed != null && parsed in min..max
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(label) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Wpisz wartość z zakresu $min–$max.")
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { new -> text = new.filter { it.isDigit() } },
+                    singleLine = true,
+                    isError = !valid,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.semantics { contentDescription = label }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { parsed?.let(onConfirm) },
+                enabled = valid
+            ) { Text("Ustaw") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Anuluj") }
+        }
+    )
 }
 
 private fun android.view.View.setStateDescriptionCompat(text: String) {

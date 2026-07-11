@@ -237,7 +237,9 @@ private fun ControlsSection(
                     max = 359.0,
                     step = 1.0,
                     valueLabel = { String.format("%03.0f°", it) },
-                    onValueChange = { setTargetCourse(settingsStore, it) }
+                    onValueChange = { setTargetCourse(settingsStore, it) },
+                    wrap = true,
+                    allowKeyboardInput = true
                 )
                 FilledTonalButton(
                     onClick = monitor::holdCurrentCourse,
