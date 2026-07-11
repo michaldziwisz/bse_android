@@ -237,7 +237,20 @@ fun AdjustableSettingRow(
         AndroidView(
             modifier = Modifier.fillMaxWidth(),
             factory = { ctx ->
-                android.widget.SeekBar(ctx).apply {
+                // Podklasa SeekBara, która na SAMYM KOŃCU budowy węzła dostępności
+                // usuwa RangeInfo. Robimy to w createAccessibilityNodeInfo (metoda
+                // wołana po całej wewnętrznej logice ProgressBara), bo delegat/
+                // onInitializeAccessibilityNodeInfo działa ZANIM ProgressBar sam
+                // dokłada RangeInfo — wtedy zerowanie jest nadpisywane i czytnik
+                // dalej mówi „100 procent". Tu wartość jest już w nazwie
+                // („Mów co 5 s", „Zadany kurs 045°"), więc procent jest zbędny.
+                object : android.widget.SeekBar(ctx) {
+                    override fun createAccessibilityNodeInfo(): android.view.accessibility.AccessibilityNodeInfo? {
+                        val info = super.createAccessibilityNodeInfo()
+                        info?.rangeInfo = null
+                        return info
+                    }
+                }.apply {
                     this.max = ticks
                     keyProgressIncrement = 1
                     progress = currentTick
@@ -262,22 +275,6 @@ fun AdjustableSettingRow(
                     androidx.core.view.ViewCompat.setAccessibilityDelegate(
                         this,
                         object : androidx.core.view.AccessibilityDelegateCompat() {
-                            override fun onInitializeAccessibilityNodeInfo(
-                                host: android.view.View,
-                                info: androidx.core.view.accessibility.AccessibilityNodeInfoCompat
-                            ) {
-                                super.onInitializeAccessibilityNodeInfo(host, info)
-                                // SeekBar dokleja własny procent (np. „99 procent")
-                                // z RangeInfo — usuwamy je na natywnym węźle, bo
-                                // wartość jest już w nazwie („Mów co 5 s", „Zadany
-                                // kurs 045°"). UWAGA: NIE wolno wołać
-                                // AccessibilityNodeInfoCompat.setRangeInfo(null) —
-                                // ta metoda robi arg.mInfo bez sprawdzenia null i
-                                // rzuca NPE (crash przy aktywnym czytniku). Natywny
-                                // setRangeInfo(null) jest bezpieczny.
-                                info.unwrap().rangeInfo = null
-                            }
-
                             override fun performAccessibilityAction(
                                 host: android.view.View,
                                 action: Int,
