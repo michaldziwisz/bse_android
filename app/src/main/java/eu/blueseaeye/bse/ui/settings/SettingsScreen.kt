@@ -11,14 +11,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Divider
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,13 +35,11 @@ import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import eu.blueseaeye.bse.data.SettingsStore
+import eu.blueseaeye.bse.model.AdministrationAction
 import eu.blueseaeye.bse.model.AppSettings
-import eu.blueseaeye.bse.model.AutoResumeMode
-import eu.blueseaeye.bse.model.CourseSource
-import eu.blueseaeye.bse.model.ReadingOutputMode
-import eu.blueseaeye.bse.model.ToneWaveform
+import eu.blueseaeye.bse.monitor.HelmMonitor
+import eu.blueseaeye.bse.ui.common.AdjustableSettingRow
 import eu.blueseaeye.bse.ui.common.LabeledTextField
-import eu.blueseaeye.bse.ui.common.NumericSettingRow
 import eu.blueseaeye.bse.ui.common.SectionHeaderText
 import eu.blueseaeye.bse.ui.common.semanticButton
 import kotlin.math.roundToInt
@@ -50,6 +47,7 @@ import kotlin.math.roundToInt
 @Composable
 fun SettingsScreen(
     settingsStore: SettingsStore,
+    monitor: HelmMonitor,
     modifier: Modifier = Modifier
 ) {
     val settings by settingsStore.settings.collectAsStateWithLifecycle()
@@ -62,34 +60,14 @@ fun SettingsScreen(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         DeviceSection(settingsStore, settings)
-        Divider()
+        HorizontalDivider()
         ReadingSection(settingsStore, settings)
-        Divider()
+        HorizontalDivider()
         ToneSection(settingsStore, settings)
-        Divider()
-        DataSourceSection(settingsStore, settings)
-        Divider()
+        HorizontalDivider()
         AuxiliarySection(settingsStore, settings)
-        Divider()
-        AutoResumeSection(settingsStore, settings)
-    }
-}
-
-@Composable
-private fun AutoResumeSection(store: SettingsStore, settings: AppSettings) {
-    SettingsSection("Wznawianie po restarcie") {
-        PickerRow(
-            label = "Wznawianie odczytu",
-            options = AutoResumeMode.entries,
-            selected = settings.autoResumeMode,
-            optionTitle = { it.title },
-            onSelected = { mode -> store.update { it.copy(autoResumeMode = mode) } }
-        )
-        Text(
-            text = "Jeśli system ubije aplikację w tle podczas dłuższej pracy, po jej ponownym uruchomieniu odczyt jest domyślnie wyłączony — trzeba go włączyć przyciskiem. Ustaw „Zawsze przy starcie”, aby odczyt wracał sam, gdy był włączony przed zamknięciem. Ustaw „Tylko po wznowieniu w tle”, aby wracał sam wyłącznie wtedy, gdy to system wznowił aplikację bez Twojego udziału.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        HorizontalDivider()
+        DeviceActionsSection(monitor)
     }
 }
 
@@ -139,58 +117,14 @@ private fun DeviceSection(store: SettingsStore, settings: AppSettings) {
 @Composable
 private fun ReadingSection(store: SettingsStore, settings: AppSettings) {
     SettingsSection("Odczyt") {
-        PickerRow(
-            label = "Sposób odczytu",
-            options = ReadingOutputMode.entries,
-            selected = settings.readingOutput,
-            optionTitle = { it.title },
-            onSelected = { mode -> store.update { it.copy(readingOutput = mode) } }
-        )
-
-        if (settings.readingOutput == ReadingOutputMode.ARIA) {
-            NumericSettingRow(
-                title = "Odstęp między aktualizacjami",
-                valueText = secondsText(settings.readingInterval),
-                decrementLabel = "Skróć odstęp między aktualizacjami",
-                incrementLabel = "Wydłuż odstęp między aktualizacjami",
-                hint = "Zakres od 1 do 45 sekund.",
-                onDecrement = { store.update { it.copy(readingInterval = it.readingInterval - 1) } },
-                onIncrement = { store.update { it.copy(readingInterval = it.readingInterval + 1) } }
-            )
-        } else {
-            NumericSettingRow(
-                title = "Głośność odczytu",
-                valueText = percentText(settings.readingVolume),
-                decrementLabel = "Zmniejsz głośność odczytu",
-                incrementLabel = "Zwiększ głośność odczytu",
-                hint = "Zakres od 0 do 100 procent.",
-                onDecrement = { store.update { it.copy(readingVolume = it.readingVolume - 5) } },
-                onIncrement = { store.update { it.copy(readingVolume = it.readingVolume + 5) } }
-            )
-            NumericSettingRow(
-                title = "Odstęp między odczytami",
-                valueText = secondsText(settings.readingDelay),
-                decrementLabel = "Skróć odstęp między odczytami",
-                incrementLabel = "Wydłuż odstęp między odczytami",
-                hint = "Zakres od 0 do 30 sekund.",
-                onDecrement = { store.update { it.copy(readingDelay = it.readingDelay - 0.5) } },
-                onIncrement = { store.update { it.copy(readingDelay = it.readingDelay + 0.5) } }
-            )
-            NumericSettingRow(
-                title = "Prędkość odczytu",
-                valueText = percentText(settings.readingRate),
-                decrementLabel = "Zmniejsz prędkość odczytu",
-                incrementLabel = "Zwiększ prędkość odczytu",
-                hint = "Zakres od 50 do 400 procent.",
-                onDecrement = { store.update { it.copy(readingRate = it.readingRate - 10) } },
-                onIncrement = { store.update { it.copy(readingRate = it.readingRate + 10) } }
-            )
-            VoicePickerRow(store, settings)
-        }
-        Text(
-            text = "Tryb czytnika ekranu najlepiej działa z aktywnym TalkBack.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+        AdjustableSettingRow(
+            label = "Mów co",
+            value = settings.readingInterval,
+            min = 5.0,
+            max = 45.0,
+            step = 5.0,
+            valueLabel = { "${it.roundToInt()} s" },
+            onValueChange = { store.update { s -> s.copy(readingInterval = it) } }
         )
     }
 }
@@ -213,84 +147,41 @@ private fun ToneSection(store: SettingsStore, settings: AppSettings) {
         ToggleRow("Szeroka rozpiętość tonów", settings.broadTonalSpread) { v ->
             store.update { it.copy(broadTonalSpread = v) }
         }
-        PickerRow(
-            label = "Typ dźwięku",
-            options = ToneWaveform.entries,
-            selected = settings.toneType,
-            optionTitle = { it.title },
-            onSelected = { w -> store.update { it.copy(toneType = w) } }
+        AdjustableSettingRow(
+            label = "Głośność sygnałów",
+            value = settings.toneVolume,
+            min = 0.0,
+            max = 100.0,
+            step = 5.0,
+            valueLabel = { "${it.roundToInt()}%" },
+            onValueChange = { store.update { s -> s.copy(toneVolume = it) } }
         )
-        NumericSettingRow(
-            title = "Głośność sygnałów",
-            valueText = percentText(settings.toneVolume),
-            decrementLabel = "Zmniejsz głośność sygnałów",
-            incrementLabel = "Zwiększ głośność sygnałów",
-            hint = "Zakres od 0 do 100 procent.",
-            onDecrement = { store.update { it.copy(toneVolume = it.toneVolume - 5) } },
-            onIncrement = { store.update { it.copy(toneVolume = it.toneVolume + 5) } }
+        AdjustableSettingRow(
+            label = "Odstęp między sygnałami",
+            value = settings.toneDelay,
+            min = 0.5,
+            max = 5.0,
+            step = 0.5,
+            valueLabel = { decimalText(it) + " s" },
+            onValueChange = { store.update { s -> s.copy(toneDelay = it) } }
         )
-        NumericSettingRow(
-            title = "Odstęp między sygnałami",
-            valueText = secondsText(settings.toneDelay),
-            decrementLabel = "Skróć odstęp między sygnałami",
-            incrementLabel = "Wydłuż odstęp między sygnałami",
-            hint = "Zakres od 0,5 do 5 sekund.",
-            onDecrement = { store.update { it.copy(toneDelay = it.toneDelay - 0.1) } },
-            onIncrement = { store.update { it.copy(toneDelay = it.toneDelay + 0.1) } }
+        AdjustableSettingRow(
+            label = "Dozwolona odchyłka",
+            value = settings.errorThreshold,
+            min = 1.0,
+            max = 15.0,
+            step = 0.5,
+            valueLabel = { decimalText(it) + "°" },
+            onValueChange = { store.update { s -> s.copy(errorThreshold = it) } }
         )
-        NumericSettingRow(
-            title = "Bazowy odstęp od tonu na kursie",
-            valueText = decimalText(settings.toneBaseOffset),
-            decrementLabel = "Zmniejsz bazowy odstęp",
-            incrementLabel = "Zwiększ bazowy odstęp",
-            hint = "Zakres od 0 do 6 półtonów.",
-            onDecrement = { store.update { it.copy(toneBaseOffset = it.toneBaseOffset - 1) } },
-            onIncrement = { store.update { it.copy(toneBaseOffset = it.toneBaseOffset + 1) } }
-        )
-        NumericSettingRow(
-            title = "Dozwolona odchyłka",
-            valueText = degreesText(settings.errorThreshold),
-            decrementLabel = "Zmniejsz dozwoloną odchyłkę",
-            incrementLabel = "Zwiększ dozwoloną odchyłkę",
-            hint = "Zakres od 1 do 15 stopni.",
-            onDecrement = { store.update { it.copy(errorThreshold = it.errorThreshold - 0.5) } },
-            onIncrement = { store.update { it.copy(errorThreshold = it.errorThreshold + 0.5) } }
-        )
-        NumericSettingRow(
-            title = "Zakres sygnalizowanej odchyłki",
-            valueText = degreesText(settings.errorRange),
-            decrementLabel = "Zmniejsz zakres sygnalizacji",
-            incrementLabel = "Zwiększ zakres sygnalizacji",
-            hint = "Zakres od 15 do 60 stopni.",
-            onDecrement = { store.update { it.copy(errorRange = it.errorRange - 1) } },
-            onIncrement = { store.update { it.copy(errorRange = it.errorRange + 1) } }
-        )
-        if (settings.readingOutput != ReadingOutputMode.ARIA) {
-            ToggleRow("Unikaj sygnalizowania w trakcie odczytu", settings.avoidSignalsOverlap) { v ->
-                store.update { it.copy(avoidSignalsOverlap = v) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DataSourceSection(store: SettingsStore, settings: AppSettings) {
-    SettingsSection("Źródło danych") {
-        PickerRow(
-            label = "Źródło kursu",
-            options = CourseSource.entries,
-            selected = settings.courseSource,
-            optionTitle = { it.title },
-            onSelected = { src -> store.update { it.copy(courseSource = src) } }
-        )
-        NumericSettingRow(
-            title = "Okno uśredniania",
-            valueText = "${settings.averageWindow} s",
-            decrementLabel = "Zmniejsz okno uśredniania",
-            incrementLabel = "Zwiększ okno uśredniania",
-            hint = "Zakres od 1 do 5 sekund.",
-            onDecrement = { store.update { it.copy(averageWindow = it.averageWindow - 1) } },
-            onIncrement = { store.update { it.copy(averageWindow = it.averageWindow + 1) } }
+        AdjustableSettingRow(
+            label = "Zakres sygnalizowanej odchyłki",
+            value = settings.errorRange,
+            min = 15.0,
+            max = 60.0,
+            step = 1.0,
+            valueLabel = { decimalText(it) + "°" },
+            onValueChange = { store.update { s -> s.copy(errorRange = it) } }
         )
     }
 }
@@ -301,51 +192,67 @@ private fun AuxiliarySection(store: SettingsStore, settings: AppSettings) {
         ToggleRow("Odwróć wychylenie steru", settings.invertRudderAngle) { v ->
             store.update { it.copy(invertRudderAngle = v) }
         }
-        NumericSettingRow(
-            title = "Poprawka wychylenia steru",
-            valueText = degreesText(settings.rudderAngleCorrection),
-            decrementLabel = "Zmniejsz poprawkę wychylenia steru",
-            incrementLabel = "Zwiększ poprawkę wychylenia steru",
-            hint = "Zakres od minus 90 do 90 stopni.",
-            onDecrement = { store.update { it.copy(rudderAngleCorrection = it.rudderAngleCorrection - 1) } },
-            onIncrement = { store.update { it.copy(rudderAngleCorrection = it.rudderAngleCorrection + 1) } }
+        AdjustableSettingRow(
+            label = "Poprawka wychylenia steru",
+            value = settings.rudderAngleCorrection,
+            min = -90.0,
+            max = 90.0,
+            step = 1.0,
+            valueLabel = { "${it.roundToInt()}°" },
+            onValueChange = { store.update { s -> s.copy(rudderAngleCorrection = it) } }
         )
     }
 }
 
 @Composable
-private fun VoicePickerRow(store: SettingsStore, settings: AppSettings) {
-    val voices = remember { SettingsStore.voices() }
+private fun DeviceActionsSection(monitor: HelmMonitor) {
+    SettingsSection("Czynności urządzenia") {
+        ConfirmableActionRow(
+            title = "Kalibracja żyroskopu",
+            warning = "Kalibrację żyroskopu należy przeprowadzić po ostatecznym zamocowaniu urządzenia do stałej części statku i gdy statek jest stabilny. Najlepiej w porcie na cumach.",
+            confirmLabel = "Kalibruj",
+            onConfirm = { monitor.runAdministrationAction(AdministrationAction.CALIBRATE) }
+        )
+        ConfirmableActionRow(
+            title = "Restart urządzenia",
+            warning = "Urządzenie uruchomi się ponownie. Po restarcie zwykle łączy się z powrotem samo. Jeśli w pobliżu jest inna zapamiętana sieć Wi-Fi, ponownie włącz odczyt na ekranie Ster, aby aplikacja wróciła do sieci „BlueSeaEye”.",
+            confirmLabel = "Restart",
+            onConfirm = { monitor.runAdministrationAction(AdministrationAction.REBOOT) }
+        )
+    }
+}
+
+@Composable
+private fun ConfirmableActionRow(
+    title: String,
+    warning: String,
+    confirmLabel: String,
+    onConfirm: () -> Unit
+) {
     var expanded by remember { mutableStateOf(false) }
-    val selectedName = voices.firstOrNull { it.id == settings.readingVoiceIdentifier }?.title ?: "Domyślny"
-    Column {
-        Text("Głos", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clearAndSetSemantics {})
-        Box {
-            OutlinedButton(
-                onClick = { expanded = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semanticButton("Głos: $selectedName. Rozwiń listę głosów.")
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        OutlinedButton(
+            onClick = { expanded = !expanded },
+            modifier = Modifier
+                .fillMaxWidth()
+                .semanticButton("$title. Pokazuje ostrzeżenie i przycisk potwierdzenia.")
+        ) {
+            Text(title)
+        }
+        if (expanded) {
+            Text(
+                text = warning,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Button(
+                onClick = {
+                    onConfirm()
+                    expanded = false
+                },
+                modifier = Modifier.semanticButton("$confirmLabel. $warning")
             ) {
-                Text(selectedName)
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                DropdownMenuItem(
-                    text = { Text("Domyślny") },
-                    onClick = {
-                        store.update { it.copy(readingVoiceIdentifier = null) }
-                        expanded = false
-                    }
-                )
-                voices.forEach { voice ->
-                    DropdownMenuItem(
-                        text = { Text(voice.title) },
-                        onClick = {
-                            store.update { it.copy(readingVoiceIdentifier = voice.id) }
-                            expanded = false
-                        }
-                    )
-                }
+                Text(confirmLabel)
             }
         }
     }
@@ -356,41 +263,6 @@ private fun SettingsSection(title: String, content: @Composable () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionHeaderText(title = title)
         content()
-    }
-}
-
-@Composable
-private fun <T> PickerRow(
-    label: String,
-    options: List<T>,
-    selected: T,
-    optionTitle: (T) -> String,
-    onSelected: (T) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Column {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.clearAndSetSemantics {})
-        Box {
-            OutlinedButton(
-                onClick = { expanded = true },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semanticButton("$label: ${optionTitle(selected)}. Rozwiń listę.")
-            ) {
-                Text(optionTitle(selected))
-            }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                options.forEach { option ->
-                    DropdownMenuItem(
-                        text = { Text(optionTitle(option)) },
-                        onClick = {
-                            onSelected(option)
-                            expanded = false
-                        }
-                    )
-                }
-            }
-        }
     }
 }
 
@@ -423,9 +295,6 @@ private fun ToggleRow(
     }
 }
 
-private fun percentText(value: Double): String = "${value.roundToInt()}%"
-private fun secondsText(value: Double): String = "${decimalText(value)} s"
-private fun degreesText(value: Double): String = "${decimalText(value)}°"
 private fun decimalText(value: Double): String {
     return if (value == value.toLong().toDouble()) value.toLong().toString()
     else String.format("%.1f", value)

@@ -52,7 +52,7 @@ fun RootScreen(
                 HelmDashboardScreen(monitor = monitor, settingsStore = settingsStore, modifier = m)
             })
             add(TabItem("Ustawienia", Icons.Filled.Settings) { m ->
-                SettingsScreen(settingsStore = settingsStore, modifier = m)
+                SettingsScreen(settingsStore = settingsStore, monitor = monitor, modifier = m)
             })
             if (FeatureFlags.ADMINISTRATION_ENABLED) {
                 add(TabItem("Administracja", Icons.Filled.Build) { m ->

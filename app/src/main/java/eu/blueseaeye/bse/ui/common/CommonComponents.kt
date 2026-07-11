@@ -186,3 +186,84 @@ fun NumericSettingRow(
 
 private fun hintedLabel(label: String, hint: String?): String =
     if (hint.isNullOrBlank()) label else "$label. $hint"
+
+/**
+ * „Wybieracz" wartości oparty o natywny android.widget.SeekBar. Czytnik ekranu
+ * (TalkBack ORAZ Jeshuo) obsługuje go gestem jednym palcem góra/dół, zmieniając
+ * wartość o jeden krok — SeekBar to standardowa kontrolka regulowana, więc oba
+ * czytniki radzą sobie z nią pewnie (czysta semantyka Compose bywa zawodna pod
+ * Jeshuo, dlatego natywna kontrolka).
+ *
+ * Operuje na wartościach zmiennoprzecinkowych; [step] to wielkość jednego kroku.
+ * Nazwa idzie jako contentDescription, a bieżąca wartość jako stateDescription
+ * (czytnik mówi np. „Mów co, 5 sekund, suwak").
+ */
+@Composable
+fun AdjustableSettingRow(
+    label: String,
+    value: Double,
+    min: Double,
+    max: Double,
+    step: Double,
+    valueLabel: (Double) -> String,
+    onValueChange: (Double) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val ticks = Math.max(1, Math.round((max - min) / step).toInt())
+    val currentTick = Math.round((value - min) / step).toInt().coerceIn(0, ticks)
+
+    Column(modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                modifier = Modifier
+                    .weight(1f)
+                    .clearAndSetSemantics {}
+            )
+            Text(
+                valueLabel(value),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.clearAndSetSemantics {}
+            )
+        }
+        AndroidView(
+            modifier = Modifier.fillMaxWidth(),
+            factory = { ctx ->
+                android.widget.SeekBar(ctx).apply {
+                    this.max = ticks
+                    progress = currentTick
+                    contentDescription = label
+                    setStateDescriptionCompat(valueLabel(value))
+                    setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+                        override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
+                            val newValue = min + progress * step
+                            sb.setStateDescriptionCompat(valueLabel(newValue))
+                            if (fromUser && getTag(R.id.labeled_text_field_self_update) != true) {
+                                onValueChange(newValue)
+                            }
+                        }
+                        override fun onStartTrackingTouch(sb: android.widget.SeekBar) {}
+                        override fun onStopTrackingTouch(sb: android.widget.SeekBar) {}
+                    })
+                }
+            },
+            update = { sb ->
+                sb.contentDescription = label
+                if (sb.max != ticks) sb.max = ticks
+                if (sb.progress != currentTick) {
+                    sb.setTag(R.id.labeled_text_field_self_update, true)
+                    sb.progress = currentTick
+                    sb.setTag(R.id.labeled_text_field_self_update, false)
+                }
+                sb.setStateDescriptionCompat(valueLabel(value))
+            }
+        )
+    }
+}
+
+private fun android.view.View.setStateDescriptionCompat(text: String) {
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        stateDescription = text
+    }
+}
