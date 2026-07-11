@@ -41,8 +41,8 @@ enum class ToneWaveform(val key: String, val title: String) {
 
 /** Tryb odczytu: pełny kurs, odchyłka od zadanego kursu albo od kąta do wiatru. */
 enum class TargetMode(val key: String, val title: String) {
-    NONE("none", "Kurs"),
-    COURSE("course", "Odchyłka od zadanego kursu"),
+    NONE("none", "Aktualny kurs"),
+    COURSE("course", "Zadany kurs"),
     WIND("wind", "Odchyłka od kąta do wiatru");
 
     companion object {

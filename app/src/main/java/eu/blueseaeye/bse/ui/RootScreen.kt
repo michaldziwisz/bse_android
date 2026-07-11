@@ -65,7 +65,10 @@ fun RootScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(tabs[selectedIndex].title) })
+            // Ekran „Ster" (indeks 0) bez górnego paska — zakładka na dole i tak go nazywa.
+            if (selectedIndex != 0) {
+                TopAppBar(title = { Text(tabs[selectedIndex].title) })
+            }
         },
         bottomBar = {
             NavigationBar {

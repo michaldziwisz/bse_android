@@ -72,13 +72,6 @@ fun CompassCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                snapshot?.wind?.let { wind ->
-                    Text(
-                        text = "Wiatr ${wind.roundToInt()}°",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
             }
         }
     }

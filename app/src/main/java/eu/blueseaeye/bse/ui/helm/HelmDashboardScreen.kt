@@ -55,7 +55,6 @@ fun HelmDashboardScreen(
     val state by monitor.state.collectAsStateWithLifecycle()
     val settings by settingsStore.settings.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
 
     Column(
         modifier = modifier
@@ -87,66 +86,10 @@ fun HelmDashboardScreen(
             })
         }
 
-        // Status
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeaderText(
-                title = "Bieżący status",
-                description = "Widok stale odświeża dane z urządzenia BlueSeaEye."
-            )
-            CompassCard(snapshot = state.snapshot, settings = settings)
-            val snapshot = state.snapshot
-            if (snapshot != null) {
-                Text(
-                    text = "Ostatnia aktualizacja: ${timeFormat.format(snapshot.fetchedAt)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Text(
-                    text = "Brak odczytów. Połącz telefon z siecią Wi-Fi „BlueSeaEye” i sprawdź adres urządzenia w Ustawieniach.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
+        // Bieżący stan — sam kafelek z odczytem (bez nagłówka i opisu)
+        CompassCard(snapshot = state.snapshot, settings = settings)
 
         ControlsSection(monitor = monitor, settingsStore = settingsStore, settings = settings, state = state)
-
-        // Ostatni komunikat (live region — czytnik odczyta zmiany)
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeaderText(
-                title = "Ostatni komunikat",
-                description = if (settings.readingOutput == ReadingOutputMode.ARIA)
-                    "Treść komunikatu jest wysyłana jako ogłoszenie dla czytnika ekranu."
-                else
-                    "Treść odpowiada ostatniemu odczytowi wypowiedzianemu przez syntezator."
-            )
-            Surface(
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.surfaceVariant,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = state.lastAnnouncement.ifEmpty { "Brak komunikatu." },
-                    modifier = Modifier
-                        .padding(16.dp)
-                        .semantics { liveRegion = LiveRegionMode.Polite }
-                )
-            }
-        }
-
-        // Urządzenie
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionHeaderText(
-                title = "Urządzenie",
-                description = "Połącz telefon z siecią Wi-Fi „BlueSeaEye”. Adres urządzenia zmienisz w Ustawieniach."
-            )
-            Text(
-                text = settings.deviceBaseUrl(),
-                fontFamily = FontFamily.Monospace,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
     }
 }
 
@@ -252,12 +195,7 @@ private fun ControlsSection(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            SectionHeaderText(
-                title = "Sterowanie odczytem",
-                description = "Możesz czytać pełny kurs albo odchyłkę od zapamiętanego kursu."
-            )
-
-            val readingLabel = if (state.isReadingEnabled) "Zatrzymaj odczyt" else "Uruchom odczyt"
+            val readingLabel = if (state.isReadingEnabled) "Stop" else "Czytaj"
             Button(
                 onClick = monitor::toggleReading,
                 modifier = Modifier
@@ -267,8 +205,9 @@ private fun ControlsSection(
                 Text(readingLabel)
             }
 
+            val targetModes = listOf(TargetMode.NONE, TargetMode.COURSE)
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                TargetMode.entries.forEachIndexed { index, mode ->
+                targetModes.forEachIndexed { index, mode ->
                     val selected = settings.target == mode
                     SegmentedButton(
                         selected = selected,
@@ -281,15 +220,11 @@ private fun ControlsSection(
                                         targetCourse = s.targetCourse
                                             ?: HelmMath.normalizedCourse(state.snapshot?.course ?: 0.0)
                                     )
-                                    TargetMode.WIND -> s.copy(
-                                        target = mode,
-                                        targetWind = s.targetWind
-                                            ?: HelmMath.normalizedCourse(state.snapshot?.wind ?: 0.0)
-                                    )
+                                    TargetMode.WIND -> s.copy(target = mode)
                                 }
                             }
                         },
-                        shape = SegmentedButtonDefaults.itemShape(index, TargetMode.entries.size),
+                        shape = SegmentedButtonDefaults.itemShape(index, targetModes.size),
                         label = { Text(mode.title) }
                     )
                 }
@@ -313,25 +248,6 @@ private fun ControlsSection(
                     Text("Ustaw aktualny kurs")
                 }
             }
-
-            if (settings.target == TargetMode.WIND) {
-                NumericSettingRow(
-                    title = "Zadany kąt do wiatru",
-                    valueText = String.format("%03.0f°", settings.targetWind ?: 0.0),
-                    decrementLabel = "Zmniejsz zadany kąt do wiatru",
-                    incrementLabel = "Zwiększ zadany kąt do wiatru",
-                    hint = "Zmiana co 1 stopień.",
-                    onDecrement = { adjustTargetWind(settingsStore, state, -1.0) },
-                    onIncrement = { adjustTargetWind(settingsStore, state, 1.0) }
-                )
-                FilledTonalButton(
-                    onClick = monitor::holdCurrentWind,
-                    enabled = state.snapshot?.wind != null,
-                    modifier = Modifier.semanticButton("Ustaw aktualny kąt do wiatru. Zapisuje aktualny kąt do wiatru jako docelowy.")
-                ) {
-                    Text("Ustaw aktualny kąt do wiatru")
-                }
-            }
         }
     }
 }
@@ -344,16 +260,5 @@ private fun adjustTargetCourse(
     settingsStore.update { s ->
         val current = s.targetCourse ?: HelmMath.normalizedCourse(state.snapshot?.course ?: 0.0)
         s.copy(targetCourse = HelmMath.normalizedCourse(current + delta))
-    }
-}
-
-private fun adjustTargetWind(
-    settingsStore: SettingsStore,
-    state: eu.blueseaeye.bse.monitor.MonitorState,
-    delta: Double
-) {
-    settingsStore.update { s ->
-        val current = s.targetWind ?: HelmMath.normalizedCourse(state.snapshot?.wind ?: 0.0)
-        s.copy(targetWind = HelmMath.normalizedCourse(current + delta))
     }
 }
