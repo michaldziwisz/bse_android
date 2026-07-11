@@ -70,7 +70,19 @@ data class HelmSnapshot(
         val parts = mutableListOf<String>()
         val value = displayedValue(settings)
         if (value != null) {
-            parts.add("$value")
+            if (settings.target == TargetMode.COURSE) {
+                // Odchyłka od zadanego kursu: ujemna = trzeba iść prawiej,
+                // dodatnia = lewiej (na życzenie użytkownika, zamiast liczby ze
+                // znakiem). Zero = na kursie.
+                val direction = when {
+                    value < 0 -> "prawiej ${abs(value)}"
+                    value > 0 -> "lewiej $value"
+                    else -> "0"
+                }
+                parts.add(direction)
+            } else {
+                parts.add("$value")
+            }
         } else {
             when (settings.target) {
                 TargetMode.NONE, TargetMode.COURSE -> parts.add("Kurs nieznany")

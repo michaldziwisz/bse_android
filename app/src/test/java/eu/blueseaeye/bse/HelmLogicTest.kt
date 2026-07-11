@@ -76,9 +76,18 @@ class HelmLogicTest {
 
     @Test
     fun spokenReadingRudderRightAndDeviation() {
+        // Tryb „Zadany kurs": odchyłka dodatnia (+10) => „lewiej 10".
         val settings = AppSettings(target = TargetMode.COURSE, targetCourse = 100.0)
         val snapshot = HelmSnapshot(course = 110.0, rudder = 5.0, wind = null, fetchedAt = Date())
-        assertEquals("10, Prawo 5", snapshot.spokenReading(settings))
+        assertEquals("lewiej 10, Prawo 5", snapshot.spokenReading(settings))
+    }
+
+    @Test
+    fun spokenReadingNegativeDeviationSaysPrawiej() {
+        // Odchyłka ujemna (-3) => „prawiej 3"; ster -2 => „Lewo 2".
+        val settings = AppSettings(target = TargetMode.COURSE, targetCourse = 100.0)
+        val snapshot = HelmSnapshot(course = 97.0, rudder = -2.0, wind = null, fetchedAt = Date())
+        assertEquals("prawiej 3, Lewo 2", snapshot.spokenReading(settings))
     }
 
     @Test
