@@ -49,7 +49,11 @@ fun RootScreen(
     val tabs = remember {
         buildList {
             add(TabItem("Ster", Icons.Filled.Explore) { m ->
-                HelmDashboardScreen(monitor = monitor, settingsStore = settingsStore, modifier = m)
+                HelmDashboardScreen(
+                    monitor = monitor,
+                    settingsStore = settingsStore,
+                    modifier = m
+                )
             })
             add(TabItem("Ustawienia", Icons.Filled.Settings) { m ->
                 SettingsScreen(settingsStore = settingsStore, monitor = monitor, modifier = m)

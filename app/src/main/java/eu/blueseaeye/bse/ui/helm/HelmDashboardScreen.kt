@@ -62,6 +62,10 @@ fun HelmDashboardScreen(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp)
     ) {
+        ConnectionStatusLine(
+            demoMode = settings.demoMode,
+            connected = state.snapshot != null && !state.isConnectionLost
+        )
         state.lastCrashReason?.let { reason ->
             CrashReportSection(
                 reason = reason,
@@ -89,6 +93,36 @@ fun HelmDashboardScreen(
         CompassCard(snapshot = state.snapshot, settings = settings)
 
         ControlsSection(monitor = monitor, settingsStore = settingsStore, settings = settings, state = state)
+    }
+}
+
+@Composable
+private fun ConnectionStatusLine(
+    demoMode: Boolean,
+    connected: Boolean
+) {
+    val text = when {
+        demoMode && connected -> "Połączony z serwerem demo"
+        demoMode && !connected -> "Brak połączenia z serwerem demo"
+        !demoMode && connected -> "Połączony z siecią BlueSeaEye"
+        else -> "Brak połączenia z siecią BlueSeaEye"
+    }
+
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = if (connected) MaterialTheme.colorScheme.primaryContainer
+        else MaterialTheme.colorScheme.errorContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.titleSmall,
+            color = if (connected) MaterialTheme.colorScheme.onPrimaryContainer
+            else MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .semantics { liveRegion = LiveRegionMode.Polite }
+        )
     }
 }
 
@@ -230,14 +264,18 @@ private fun ControlsSection(
             }
 
             if (settings.target == TargetMode.COURSE) {
+                // Kurs kompasowy prezentujemy jako 1–360 (360 = północ). Wewnętrznie
+                // trzymamy 0–359 (0 = północ), więc 360 mapujemy na 0 przy zapisie,
+                // a zapisane 0 pokazujemy jako 360.
+                val displayCourse = (settings.targetCourse ?: 0.0).let { if (it == 0.0) 360.0 else it }
                 AdjustableSettingRow(
                     label = "Zadany kurs",
-                    value = settings.targetCourse ?: 0.0,
-                    min = 0.0,
-                    max = 359.0,
+                    value = displayCourse,
+                    min = 1.0,
+                    max = 360.0,
                     step = 1.0,
-                    valueLabel = { String.format("%03.0f°", it) },
-                    onValueChange = { setTargetCourse(settingsStore, it) },
+                    valueLabel = { degreesPolish(it.toInt()) },
+                    onValueChange = { setTargetCourse(settingsStore, if (it >= 360.0) 0.0 else it) },
                     wrap = true,
                     allowKeyboardInput = true
                 )
@@ -256,5 +294,20 @@ private fun ControlsSection(
 private fun setTargetCourse(settingsStore: SettingsStore, value: Double) {
     settingsStore.update { s ->
         s.copy(targetCourse = HelmMath.normalizedCourse(value))
+    }
+}
+
+/** Liczba stopni z polską odmianą rzeczownika: 1 stopień, 2 stopnie, 20 stopni. */
+private fun degreesPolish(n: Int): String = "$n ${degreeWord(n)}"
+
+private fun degreeWord(n: Int): String {
+    val abs = Math.abs(n)
+    val mod100 = abs % 100
+    val mod10 = abs % 10
+    return when {
+        abs == 1 -> "stopień"
+        mod100 in 12..14 -> "stopni"
+        mod10 in 2..4 -> "stopnie"
+        else -> "stopni"
     }
 }

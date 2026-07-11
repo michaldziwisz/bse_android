@@ -31,10 +31,8 @@ class MainActivity : ComponentActivity() {
 
         requestNotificationPermissionIfNeeded()
 
-        // Ekran nie gaśnie w trakcie aktywnego odczytu (odpowiednik isIdleTimerDisabled).
-        // Dodatkowo, gdy odczyt trwa, przypinamy ruch aplikacji do sieci Wi-Fi
-        // urządzenia BlueSeaEye, żeby system nie przełączył nas na inną
-        // zapamiętaną sieć (np. statkowy internet) w środku żeglugi.
+        // Ekran nie gaśnie w trakcie aktywnego odczytu (odpowiednik isIdleTimerDisabled)
+        // oraz uruchamiamy/zatrzymujemy usługę pierwszoplanową wraz z odczytem.
         lifecycleScope.launch {
             container.monitor.state
                 .map { it.isReadingEnabled }
@@ -43,16 +41,29 @@ class MainActivity : ComponentActivity() {
                     if (reading) {
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         HelmForegroundService.start(this@MainActivity)
-                        val settings = container.settingsStore.current
-                        if (settings.keepDeviceWifi && !settings.demoMode) {
-                            container.deviceNetworkBinder.start(
-                                AppSettings.DEVICE_WIFI_SSID,
-                                AppSettings.DEVICE_WIFI_PASSPHRASE
-                            )
-                        }
                     } else {
                         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         HelmForegroundService.stop(this@MainActivity)
+                    }
+                }
+        }
+
+        // Połączenie z siecią BlueSeaEye trzymamy OD RAZU po starcie (nie dopiero
+        // po włączeniu odczytu), żeby transmisja była pewna od pierwszej chwili.
+        // Reagujemy też na zmianę ustawień: włączenie trybu demo lub wyłączenie
+        // „trzymaj sieć" zdejmuje wiązanie, powrót — przywraca. Systemowe okno
+        // zgody „Połączyć z BlueSeaEye?" pojawia się raz, gdy jesteśmy na wierzchu.
+        lifecycleScope.launch {
+            container.settingsStore.settings
+                .map { it.keepDeviceWifi && !it.demoMode }
+                .distinctUntilChanged()
+                .collect { shouldHold ->
+                    if (shouldHold) {
+                        container.deviceNetworkBinder.start(
+                            AppSettings.DEVICE_WIFI_SSID,
+                            AppSettings.DEVICE_WIFI_PASSPHRASE
+                        )
+                    } else {
                         container.deviceNetworkBinder.stop()
                     }
                 }
