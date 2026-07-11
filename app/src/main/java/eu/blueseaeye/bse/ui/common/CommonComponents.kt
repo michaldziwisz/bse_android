@@ -268,9 +268,14 @@ fun AdjustableSettingRow(
                             ) {
                                 super.onInitializeAccessibilityNodeInfo(host, info)
                                 // SeekBar dokleja własny procent (np. „99 procent")
-                                // z RangeInfo — zerujemy je, bo wartość jest już w
-                                // nazwie („Mów co 5 s", „Zadany kurs 045°”).
-                                info.rangeInfo = null
+                                // z RangeInfo — usuwamy je na natywnym węźle, bo
+                                // wartość jest już w nazwie („Mów co 5 s", „Zadany
+                                // kurs 045°"). UWAGA: NIE wolno wołać
+                                // AccessibilityNodeInfoCompat.setRangeInfo(null) —
+                                // ta metoda robi arg.mInfo bez sprawdzenia null i
+                                // rzuca NPE (crash przy aktywnym czytniku). Natywny
+                                // setRangeInfo(null) jest bezpieczny.
+                                info.unwrap().rangeInfo = null
                             }
 
                             override fun performAccessibilityAction(
