@@ -259,29 +259,31 @@ fun AdjustableSettingRow(
 
                     private fun applyRange(info: android.view.accessibility.AccessibilityNodeInfo) {
                         val current = valueLabel(valueForTick(progress))
-                        // ŹRÓDŁO PROCENTU (potwierdzone logcatem): ProgressBar na
-                        // Androidzie 10+ ustawia stateDescription na „N%" —
-                        // niezależnie od RangeInfo i klasy widoku. To ono, a nie
-                        // RangeInfo, każe TalkBackowi mówić procent. Nadpisujemy je
-                        // realną wartością, a RangeInfo zerujemy dla pewności.
+                        // Kolejność: TalkBack czyta stateDescription PRZED
+                        // contentDescription. Chcemy „nazwa, wartość", więc całą
+                        // frazę dajemy w contentDescription, a stateDescription
+                        // czyścimy — inaczej (a) słychać wartość przed nazwą oraz
+                        // (b) ProgressBar wstawia tam „N%".
                         info.rangeInfo = null
-                        info.contentDescription = label
-                        info.stateDescription = current
+                        info.stateDescription = ""
+                        info.contentDescription = "$label $current"
                     }
                 }.apply {
                     this.max = ticks
                     keyProgressIncrement = 1
                     progress = currentTick
-                    // Nazwa = sama etykieta; wartość idzie w stateDescription
-                    // (patrz applyRange) — inaczej TalkBack dokleiłby procent.
-                    contentDescription = label
-                    setStateDescriptionCompat(valueLabel(valueForTick(currentTick)))
+                    // Nazwa niesie całą frazę „nazwa wartość"; stateDescription
+                    // czyścimy, żeby TalkBack nie czytał wartości przed nazwą ani
+                    // procentu (patrz applyRange).
+                    contentDescription = "$label ${valueLabel(valueForTick(currentTick))}"
+                    setStateDescriptionCompat("")
 
                     // Zmiana wartości przez użytkownika (dotyk paska lub nasze akcje
                     // dostępności) — aktualizujemy model i wartość dla czytnika.
                     setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
                         override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
-                            sb.setStateDescriptionCompat(valueLabel(valueForTick(progress)))
+                            sb.contentDescription = "$label ${valueLabel(valueForTick(progress))}"
+                            sb.setStateDescriptionCompat("")
                             if (fromUser && getTag(R.id.labeled_text_field_self_update) != true) {
                                 onValueChange(min + progress * step)
                             }
@@ -325,8 +327,8 @@ fun AdjustableSettingRow(
                     sb.progress = currentTick
                     sb.setTag(R.id.labeled_text_field_self_update, false)
                 }
-                sb.contentDescription = label
-                sb.setStateDescriptionCompat(valueLabel(valueForTick(currentTick)))
+                sb.contentDescription = "$label ${valueLabel(valueForTick(currentTick))}"
+                sb.setStateDescriptionCompat("")
             }
         )
     }
