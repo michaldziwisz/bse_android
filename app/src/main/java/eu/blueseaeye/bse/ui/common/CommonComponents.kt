@@ -217,7 +217,7 @@ fun AdjustableSettingRow(
 ) {
     val ticks = Math.max(1, Math.round((max - min) / step).toInt())
     val currentTick = Math.round((value - min) / step).toInt().coerceIn(0, ticks)
-    fun spoken(tick: Int): String = "$label ${valueLabel(min + tick * step)}"
+    fun valueForTick(tick: Int): Double = min + tick * step
 
     Column(modifier.fillMaxWidth(), Arrangement.spacedBy(4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -237,38 +237,51 @@ fun AdjustableSettingRow(
         AndroidView(
             modifier = Modifier.fillMaxWidth(),
             factory = { ctx ->
-                // Podklasa SeekBara, która na SAMYM KOŃCU budowy węzła dostępności
-                // usuwa RangeInfo. Robimy to w createAccessibilityNodeInfo (metoda
-                // wołana po całej wewnętrznej logice ProgressBara), bo delegat/
-                // onInitializeAccessibilityNodeInfo działa ZANIM ProgressBar sam
-                // dokłada RangeInfo — wtedy zerowanie jest nadpisywane i czytnik
-                // dalej mówi „100 procent". Tu wartość jest już w nazwie
-                // („Mów co 5 s", „Zadany kurs 045°"), więc procent jest zbędny.
+                // Natywny SeekBar zapewnia gest czytnika góra/dół (regulacja).
+                // PROBLEM: Samsung TalkBack dla suwaka z domyślnym zakresem czyta
+                // wartość jako PROCENT (progress/max). Rozwiązanie: nadpisujemy
+                // węzeł dostępności tak, aby zakres był typu INT z REALNĄ wartością
+                // (sekundy/stopnie/procenty ustawień) — wtedy czytnik mówi liczbę,
+                // nie „N procent". Nazwa (label) idzie osobno jako contentDescription.
                 object : android.widget.SeekBar(ctx) {
+                    override fun onInitializeAccessibilityNodeInfo(
+                        info: android.view.accessibility.AccessibilityNodeInfo
+                    ) {
+                        super.onInitializeAccessibilityNodeInfo(info)
+                        applyRange(info)
+                    }
+
                     override fun createAccessibilityNodeInfo(): android.view.accessibility.AccessibilityNodeInfo? {
                         val info = super.createAccessibilityNodeInfo()
-                        info?.rangeInfo = null
-                        // TalkBack dokleja „N procent" na podstawie samej KLASY
-                        // widoku (SeekBar/ProgressBar), niezależnie od RangeInfo.
-                        // Podajemy klasę zwykłego View, żeby nie był rozpoznawany
-                        // jako pasek postępu — wartość jest już w nazwie
-                        // („Mów co 5 s"). Akcje przewijania (regulacja gestem)
-                        // zostają, bo dodaje je nasz delegat.
-                        info?.className = android.view.View::class.java.name
+                        if (info != null) applyRange(info)
                         return info
+                    }
+
+                    private fun applyRange(info: android.view.accessibility.AccessibilityNodeInfo) {
+                        val current = valueLabel(valueForTick(progress))
+                        // ŹRÓDŁO PROCENTU (potwierdzone logcatem): ProgressBar na
+                        // Androidzie 10+ ustawia stateDescription na „N%" —
+                        // niezależnie od RangeInfo i klasy widoku. To ono, a nie
+                        // RangeInfo, każe TalkBackowi mówić procent. Nadpisujemy je
+                        // realną wartością, a RangeInfo zerujemy dla pewności.
+                        info.rangeInfo = null
+                        info.contentDescription = label
+                        info.stateDescription = current
                     }
                 }.apply {
                     this.max = ticks
                     keyProgressIncrement = 1
                     progress = currentTick
-                    // Cała fraza jako jedna nazwa (kolejność: nazwa, potem wartość).
-                    contentDescription = spoken(currentTick)
+                    // Nazwa = sama etykieta; wartość idzie w stateDescription
+                    // (patrz applyRange) — inaczej TalkBack dokleiłby procent.
+                    contentDescription = label
+                    setStateDescriptionCompat(valueLabel(valueForTick(currentTick)))
 
                     // Zmiana wartości przez użytkownika (dotyk paska lub nasze akcje
-                    // dostępności) — aktualizujemy model i nazwę.
+                    // dostępności) — aktualizujemy model i wartość dla czytnika.
                     setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
                         override fun onProgressChanged(sb: android.widget.SeekBar, progress: Int, fromUser: Boolean) {
-                            sb.contentDescription = spoken(progress)
+                            sb.setStateDescriptionCompat(valueLabel(valueForTick(progress)))
                             if (fromUser && getTag(R.id.labeled_text_field_self_update) != true) {
                                 onValueChange(min + progress * step)
                             }
@@ -312,8 +325,15 @@ fun AdjustableSettingRow(
                     sb.progress = currentTick
                     sb.setTag(R.id.labeled_text_field_self_update, false)
                 }
-                sb.contentDescription = spoken(currentTick)
+                sb.contentDescription = label
+                sb.setStateDescriptionCompat(valueLabel(valueForTick(currentTick)))
             }
         )
+    }
+}
+
+private fun android.view.View.setStateDescriptionCompat(text: String) {
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+        androidx.core.view.ViewCompat.setStateDescription(this, text)
     }
 }
