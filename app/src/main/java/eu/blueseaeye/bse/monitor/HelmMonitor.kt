@@ -327,22 +327,15 @@ class HelmMonitor(
 
             if (!(errorExceeded || settings.toneOnCourse || !onTarget)) return
 
-            // Czasy trwania tonów zależą od ustawienia „Krótsze sygnały" —
-            // dokładnie jak w urządzeniu: ton referencyjny 80/160 ms, przerwa
-            // 20/40 ms, ton właściwy 100/200 ms.
-            val referenceToneDuration = if (settings.shortTones) 0.08 else 0.16
-            val referencePauseMs = if (settings.shortTones) 20L else 40L
-            val mainToneDuration = if (settings.shortTones) 0.1 else 0.2
+            // Ton właściwy: 100 ms (krótki). Ton referencyjny został usunięty na
+            // życzenie — sygnalizujemy wyłącznie ton odchyłki.
+            val mainToneDuration = 0.1
 
             if (errorExceeded || (!onTarget && delta != 0.0)) {
                 val compensatedDelta = absoluteDelta - (if (onTarget) settings.errorThreshold else 0.0)
                 val severity = minOf(compensatedDelta, settings.errorRange)
                 val gain = if (delta > 0) 1.0 else -1.0
                 val multiplier = if (settings.broadTonalSpread) 2.0 else 1.0
-                if (settings.referenceTone) {
-                    tonePlayer.play(frequencyMid, referenceToneDuration, settings.toneVolume / 100.0, settings.toneType)
-                    delay(referencePauseMs)
-                }
                 val baseOffset = settings.toneBaseOffset / 12.0
                 val frequency = frequencyMid * 2.0.pow(
                     gain * ((multiplier * severity / settings.errorRange) + baseOffset)

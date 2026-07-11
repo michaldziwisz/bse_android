@@ -41,6 +41,7 @@ import eu.blueseaeye.bse.monitor.HelmMonitor
 import eu.blueseaeye.bse.ui.common.AdjustableSettingRow
 import eu.blueseaeye.bse.ui.common.LabeledTextField
 import eu.blueseaeye.bse.ui.common.SectionHeaderText
+import eu.blueseaeye.bse.ui.common.degreesPolish
 import eu.blueseaeye.bse.ui.common.semanticButton
 import kotlin.math.roundToInt
 
@@ -120,9 +121,9 @@ private fun ReadingSection(store: SettingsStore, settings: AppSettings) {
         AdjustableSettingRow(
             label = "Mów co",
             value = settings.readingInterval,
-            min = 5.0,
+            min = 1.0,
             max = 45.0,
-            step = 5.0,
+            step = 1.0,
             valueLabel = { "${it.roundToInt()} s" },
             onValueChange = { store.update { s -> s.copy(readingInterval = it) } }
         )
@@ -135,17 +136,8 @@ private fun ToneSection(store: SettingsStore, settings: AppSettings) {
         ToggleRow("Odtwarzaj sygnały dźwiękowe", settings.soundSignalsEnabled) { v ->
             store.update { it.copy(soundSignalsEnabled = v) }
         }
-        ToggleRow("Odtwarzaj ton referencyjny", settings.referenceTone) { v ->
-            store.update { it.copy(referenceTone = v) }
-        }
         ToggleRow("Odtwarzaj ton na zadanym kursie", settings.toneOnCourse) { v ->
             store.update { it.copy(toneOnCourse = v) }
-        }
-        ToggleRow("Krótsze sygnały", settings.shortTones) { v ->
-            store.update { it.copy(shortTones = v) }
-        }
-        ToggleRow("Szeroka rozpiętość tonów", settings.broadTonalSpread) { v ->
-            store.update { it.copy(broadTonalSpread = v) }
         }
         AdjustableSettingRow(
             label = "Głośność sygnałów",
@@ -166,22 +158,13 @@ private fun ToneSection(store: SettingsStore, settings: AppSettings) {
             onValueChange = { store.update { s -> s.copy(toneDelay = it) } }
         )
         AdjustableSettingRow(
-            label = "Dozwolona odchyłka",
+            label = "Tolerancja zadanego kursu",
             value = settings.errorThreshold,
             min = 1.0,
-            max = 15.0,
-            step = 0.5,
-            valueLabel = { decimalText(it) + "°" },
-            onValueChange = { store.update { s -> s.copy(errorThreshold = it) } }
-        )
-        AdjustableSettingRow(
-            label = "Zakres sygnalizowanej odchyłki",
-            value = settings.errorRange,
-            min = 15.0,
-            max = 60.0,
+            max = 5.0,
             step = 1.0,
-            valueLabel = { decimalText(it) + "°" },
-            onValueChange = { store.update { s -> s.copy(errorRange = it) } }
+            valueLabel = { degreesPolish(it.roundToInt()) },
+            onValueChange = { store.update { s -> s.copy(errorThreshold = it) } }
         )
     }
 }

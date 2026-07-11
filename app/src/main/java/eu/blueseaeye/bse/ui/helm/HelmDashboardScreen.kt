@@ -41,6 +41,7 @@ import eu.blueseaeye.bse.model.TargetMode
 import eu.blueseaeye.bse.data.SettingsStore
 import eu.blueseaeye.bse.monitor.HelmMonitor
 import eu.blueseaeye.bse.ui.common.AdjustableSettingRow
+import eu.blueseaeye.bse.ui.common.degreesPolish
 import eu.blueseaeye.bse.ui.common.semanticButton
 import java.text.SimpleDateFormat
 import java.util.Locale
@@ -294,20 +295,5 @@ private fun ControlsSection(
 private fun setTargetCourse(settingsStore: SettingsStore, value: Double) {
     settingsStore.update { s ->
         s.copy(targetCourse = HelmMath.normalizedCourse(value))
-    }
-}
-
-/** Liczba stopni z polską odmianą rzeczownika: 1 stopień, 2 stopnie, 20 stopni. */
-private fun degreesPolish(n: Int): String = "$n ${degreeWord(n)}"
-
-private fun degreeWord(n: Int): String {
-    val abs = Math.abs(n)
-    val mod100 = abs % 100
-    val mod10 = abs % 10
-    return when {
-        abs == 1 -> "stopień"
-        mod100 in 12..14 -> "stopni"
-        mod10 in 2..4 -> "stopnie"
-        else -> "stopni"
     }
 }
