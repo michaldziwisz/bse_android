@@ -248,6 +248,13 @@ fun AdjustableSettingRow(
                     override fun createAccessibilityNodeInfo(): android.view.accessibility.AccessibilityNodeInfo? {
                         val info = super.createAccessibilityNodeInfo()
                         info?.rangeInfo = null
+                        // TalkBack dokleja „N procent" na podstawie samej KLASY
+                        // widoku (SeekBar/ProgressBar), niezależnie od RangeInfo.
+                        // Podajemy klasę zwykłego View, żeby nie był rozpoznawany
+                        // jako pasek postępu — wartość jest już w nazwie
+                        // („Mów co 5 s"). Akcje przewijania (regulacja gestem)
+                        // zostają, bo dodaje je nasz delegat.
+                        info?.className = android.view.View::class.java.name
                         return info
                     }
                 }.apply {
