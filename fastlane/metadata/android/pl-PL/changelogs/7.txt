@@ -1,0 +1,5 @@
+Nowości w wersji 1.0.1:
+
+- Magiczne stuknięcie (dwa palce, dwukrotne stuknięcie z czytnikiem ekranu) włącza i wyłącza odczyt z dowolnego miejsca w aplikacji.
+- Ustawienia wychylenia steru przeniesione do zwijanej sekcji „Zaawansowane”.
+- Sekcja „Zaawansowane” pojawia się tylko wtedy, gdy urządzenie przesyła dane o wychyleniu steru — podobnie jak przy wietrze.
