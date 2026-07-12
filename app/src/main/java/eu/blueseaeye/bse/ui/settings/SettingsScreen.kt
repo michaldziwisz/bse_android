@@ -52,6 +52,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier
 ) {
     val settings by settingsStore.settings.collectAsStateWithLifecycle()
+    val monitorState by monitor.state.collectAsStateWithLifecycle()
 
     Column(
         modifier = modifier
@@ -65,8 +66,13 @@ fun SettingsScreen(
         ReadingSection(settingsStore, settings)
         HorizontalDivider()
         ToneSection(settingsStore, settings)
-        HorizontalDivider()
-        AuxiliarySection(settingsStore, settings)
+        // Sekcję „Zaawansowane” (wychylenie steru) pokazujemy tylko wtedy, gdy
+        // urządzenie faktycznie dostarcza dane o wychyleniu płetwy steru (rsa) —
+        // analogicznie jak przy wietrze.
+        if (monitorState.snapshot?.rudder != null) {
+            HorizontalDivider()
+            AdvancedSection(settingsStore, settings)
+        }
         HorizontalDivider()
         DeviceActionsSection(monitor)
     }
@@ -170,20 +176,36 @@ private fun ToneSection(store: SettingsStore, settings: AppSettings) {
 }
 
 @Composable
-private fun AuxiliarySection(store: SettingsStore, settings: AppSettings) {
-    SettingsSection("Ustawienia pomocnicze") {
-        ToggleRow("Odwróć wychylenie steru", settings.invertRudderAngle) { v ->
-            store.update { it.copy(invertRudderAngle = v) }
+private fun AdvancedSection(store: SettingsStore, settings: AppSettings) {
+    var expanded by remember { mutableStateOf(false) }
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        val stateLabel = if (expanded) "rozwinięte" else "zwinięte"
+        OutlinedButton(
+            onClick = { expanded = !expanded },
+            modifier = Modifier
+                .fillMaxWidth()
+                .clearAndSetSemantics {
+                    contentDescription = "Zaawansowane"
+                    role = Role.Button
+                    stateDescription = stateLabel
+                }
+        ) {
+            Text("Zaawansowane")
         }
-        AdjustableSettingRow(
-            label = "Poprawka wychylenia steru",
-            value = settings.rudderAngleCorrection,
-            min = -90.0,
-            max = 90.0,
-            step = 1.0,
-            valueLabel = { "${it.roundToInt()}°" },
-            onValueChange = { store.update { s -> s.copy(rudderAngleCorrection = it) } }
-        )
+        if (expanded) {
+            ToggleRow("Odwróć wychylenie steru", settings.invertRudderAngle) { v ->
+                store.update { it.copy(invertRudderAngle = v) }
+            }
+            AdjustableSettingRow(
+                label = "Poprawka wychylenia steru",
+                value = settings.rudderAngleCorrection,
+                min = -90.0,
+                max = 90.0,
+                step = 1.0,
+                valueLabel = { "${it.roundToInt()}°" },
+                onValueChange = { store.update { s -> s.copy(rudderAngleCorrection = it) } }
+            )
+        }
     }
 }
 

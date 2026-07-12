@@ -22,6 +22,10 @@ class MainActivity : ComponentActivity() {
 
     private val container by lazy { (application as BseApplication).container }
 
+    // Sesja multimediów umożliwiająca gest „magiczne stuknięcie” czytnika ekranu
+    // (TalkBack: dwa palce, dwukrotne stuknięcie) do włączania/wyłączania odczytu.
+    private var mediaSession: eu.blueseaeye.bse.audio.HelmMediaSession? = null
+
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { /* wynik nieistotny — alert i tak spróbuje, a brak zgody tylko go wyciszy */ }
@@ -31,6 +35,12 @@ class MainActivity : ComponentActivity() {
 
         requestNotificationPermissionIfNeeded()
 
+        // Sesja multimediów: gest „magiczne stuknięcie” czytnika (dwa palce,
+        // dwukrotne stuknięcie) przełącza odczyt, tak jak magic tap w iOS.
+        mediaSession = eu.blueseaeye.bse.audio.HelmMediaSession(this) {
+            container.monitor.toggleReading()
+        }
+
         // Ekran nie gaśnie w trakcie aktywnego odczytu (odpowiednik isIdleTimerDisabled)
         // oraz uruchamiamy/zatrzymujemy usługę pierwszoplanową wraz z odczytem.
         lifecycleScope.launch {
@@ -38,6 +48,7 @@ class MainActivity : ComponentActivity() {
                 .map { it.isReadingEnabled }
                 .distinctUntilChanged()
                 .collect { reading ->
+                    mediaSession?.updatePlaybackState(reading)
                     if (reading) {
                         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                         HelmForegroundService.start(this@MainActivity)
@@ -98,6 +109,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        mediaSession?.release()
+        mediaSession = null
         if (isFinishing) {
             container.monitor.stop()
             HelmForegroundService.stop(this)
