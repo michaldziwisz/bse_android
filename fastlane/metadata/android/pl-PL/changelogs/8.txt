@@ -1,0 +1,4 @@
+Nowości w wersji 1.0.2:
+
+- Sygnały odchyłki od kursu to teraz nagrane dźwięki (osobny dla lewej i prawej strony) zamiast generowanego tonu.
+- Im większa odchyłka, tym wyższy dźwięk — kierunek rozpoznasz po samym brzmieniu, bez patrzenia na ekran.

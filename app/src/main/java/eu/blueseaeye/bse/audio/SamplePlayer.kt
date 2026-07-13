@@ -5,6 +5,7 @@ import android.media.AudioFormat
 import android.media.AudioTrack
 import android.media.PlaybackParams
 import android.content.Context
+import android.util.Log
 import androidx.annotation.RawRes
 import eu.blueseaeye.bse.R
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,10 @@ class SamplePlayer(context: Context) {
     private val appContext = context.applicationContext
     private val cache = HashMap<Signal, Pcm>()
 
+    private companion object {
+        const val TAG = "SamplePlayer"
+    }
+
     @Volatile
     private var activeTrack: AudioTrack? = null
 
@@ -64,33 +69,48 @@ class SamplePlayer(context: Context) {
         pitchRatio: Double,
         volume: Double
     ) = withContext(Dispatchers.Default) {
-        runCatching {
-            val pcm = load(signal) ?: return@withContext
+        try {
+            val pcm = load(signal)
+            if (pcm == null) {
+                Log.e(TAG, "play($signal): brak zdekodowanej probki (load=null)")
+                return@withContext
+            }
             stop()
             val output = scaleVolume(pcm.samples, volume)
-            if (output.isEmpty()) return@withContext
+            if (output.isEmpty()) {
+                Log.e(TAG, "play($signal): pusta probka po skalowaniu (samples=${pcm.samples.size})")
+                return@withContext
+            }
             val track = buildTrack(pcm.sampleRate, output.size)
             activeTrack = track
 
-            // Podnosimy TYLKO wysokość, tempo zostaje (speed = 1.0). Pitch poza
-            // obsługiwanym zakresem rzuciłby wyjątek — clamp + runCatching chroni;
-            // gdyby się nie udało, próbka i tak zagra w naturalnej wysokości.
-            val pitch = pitchRatio.coerceIn(0.5, 4.0).toFloat()
-            runCatching {
-                track.playbackParams = PlaybackParams()
-                    .setPitch(pitch)
-                    .setSpeed(1.0f)
+            val written = track.write(output, 0, output.size)
+            if (written < 0) {
+                Log.e(TAG, "play($signal): write blad=$written")
+                stop()
+                return@withContext
             }
 
-            track.write(output, 0, output.size)
+            // Pitch (jesli >1) ustawiamy PRZED play na tracku STATIC. Gdy sie nie
+            // uda (limity urzadzenia) — probka gra w naturalnej wysokosci.
+            val pitch = pitchRatio.coerceIn(0.5, 4.0).toFloat()
+            if (pitch != 1.0f) {
+                runCatching {
+                    track.playbackParams = track.playbackParams
+                        .setPitch(pitch)
+                        .setSpeed(1.0f)
+                }.onFailure { Log.w(TAG, "play($signal): setPitch($pitch) nieudane: ${it.message}") }
+            }
+
             track.play()
-            // Czas trwania odtwarzania = długość próbki (speed = 1.0 nie zmienia
-            // tempa; pitch rozciągany jest w czasie tak, by długość została).
+
             val durationMs = (output.size.toLong() * 1000L) / pcm.sampleRate.coerceAtLeast(1)
-            delay(durationMs)
+            delay(durationMs + 40L)
             if (activeTrack === track) {
                 stop()
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "play($signal) wyjatek: ${e.message}", e)
         }
     }
 
@@ -107,12 +127,9 @@ class SamplePlayer(context: Context) {
     }
 
     private fun buildTrack(sampleRate: Int, frameCount: Int): AudioTrack {
+        // Bufor = dokladny rozmiar probki (MODE_STATIC wymaga zmieszczenia calej
+        // probki w buforze; dokladnie jak dzialajacy TonePlayer).
         val bufferSizeBytes = (frameCount * 2).coerceAtLeast(1)
-        val minBuffer = AudioTrack.getMinBufferSize(
-            sampleRate,
-            AudioFormat.CHANNEL_OUT_MONO,
-            AudioFormat.ENCODING_PCM_16BIT
-        ).coerceAtLeast(bufferSizeBytes)
 
         return AudioTrack.Builder()
             .setAudioAttributes(
@@ -128,8 +145,8 @@ class SamplePlayer(context: Context) {
                     .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
                     .build()
             )
-            .setBufferSizeInBytes(minBuffer)
-            .setTransferMode(AudioTrack.MODE_STREAM)
+            .setBufferSizeInBytes(bufferSizeBytes)
+            .setTransferMode(AudioTrack.MODE_STATIC)
             .build()
     }
 
@@ -201,6 +218,26 @@ class SamplePlayer(context: Context) {
             samples[i] = ((bytes[b].toInt() and 0xFF) or (bytes[b + 1].toInt() shl 8)).toShort()
             i++
             b += 2
+        }
+        // NORMALIZACJA do pelnej skali. Dostarczone nagrania sa ciche u zrodla
+        // (peak ~45-50% FS, RMS ~13-19%), a mnozone jeszcze przez ustawienie
+        // glosnosci (~20%) i systemowa glosnosc multimediow schodza do ~-45 dB =
+        // praktycznie cisza (log z S25: track gra, ale niesłyszalny). Dawny generator
+        // tonow gral pelna fala (0.9 FS), stad byl slyszalny przy tych samych
+        // ustawieniach. Podbijamy szczyt kazdej probki do 0.97 FS - wyrownuje tez
+        // glosnosc miedzy 0/l1/r1 (kazdy mial inny peak).
+        var peak = 0
+        for (s in samples) {
+            val a = if (s.toInt() == Short.MIN_VALUE.toInt()) Short.MAX_VALUE.toInt() else kotlin.math.abs(s.toInt())
+            if (a > peak) peak = a
+        }
+        if (peak in 1 until 31785) { // 31785 ~= 0.97 * 32767; ponizej = warto podbic
+            val gain = (0.97 * Short.MAX_VALUE) / peak
+            val maxAbs = Short.MAX_VALUE.toDouble()
+            for (j in samples.indices) {
+                val v = (samples[j].toDouble() * gain).coerceIn(-maxAbs, maxAbs)
+                samples[j] = v.toInt().toShort()
+            }
         }
         return Pcm(samples, sampleRate)
     }
