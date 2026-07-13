@@ -1,9 +1,10 @@
 package eu.blueseaeye.bse.audio
 
-import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
+import android.media.PlaybackParams
+import android.content.Context
 import androidx.annotation.RawRes
 import eu.blueseaeye.bse.R
 import kotlinx.coroutines.Dispatchers
@@ -19,9 +20,11 @@ import java.io.ByteArrayOutputStream
  *  - [Signal.RIGHT]  (r1.wav) — odchyłka w prawo („prawiej”).
  *
  * Wysokość dźwięku podnosimy wraz z wielkością odchyłki — dokładnie tak jak
- * dawniej robił to generator tonów. Realizujemy to programowym resamplingiem
- * (liniowa interpolacja): [pitchRatio] > 1 skraca próbkę i podnosi jej wysokość,
- * bez zależności od natywnych limitów częstotliwości AudioTrack.
+ * dawniej robił to generator tonów. Podnosimy WYŁĄCZNIE wysokość (pitch),
+ * ZACHOWUJĄC długość i tempo próbki: używamy [PlaybackParams.setPitch] przy
+ * [PlaybackParams.setSpeed] = 1.0. Pod spodem framework (Sonic) rozciąga w
+ * czasie, więc próbka nie jest „przyspieszona”, tylko wyższa. Dostępne od API 23
+ * (minSdk 26 — bez problemu).
  *
  * Próbki dekodujemy raz i trzymamy w pamięci (są krótkie: 60–110 ms).
  */
@@ -54,6 +57,7 @@ class SamplePlayer(context: Context) {
     /**
      * Odtwarza wskazaną próbkę [signal] z zadaną wysokością ([pitchRatio], 1.0 =
      * naturalna wysokość, 2.0 = oktawa wyżej) i głośnością [volume] (0.0–1.0).
+     * Długość i tempo próbki pozostają bez zmian — zmienia się wyłącznie wysokość.
      */
     suspend fun play(
         signal: Signal,
@@ -63,12 +67,25 @@ class SamplePlayer(context: Context) {
         runCatching {
             val pcm = load(signal) ?: return@withContext
             stop()
-            val output = resampleAndScale(pcm.samples, pitchRatio, volume)
+            val output = scaleVolume(pcm.samples, volume)
             if (output.isEmpty()) return@withContext
             val track = buildTrack(pcm.sampleRate, output.size)
             activeTrack = track
+
+            // Podnosimy TYLKO wysokość, tempo zostaje (speed = 1.0). Pitch poza
+            // obsługiwanym zakresem rzuciłby wyjątek — clamp + runCatching chroni;
+            // gdyby się nie udało, próbka i tak zagra w naturalnej wysokości.
+            val pitch = pitchRatio.coerceIn(0.5, 4.0).toFloat()
+            runCatching {
+                track.playbackParams = PlaybackParams()
+                    .setPitch(pitch)
+                    .setSpeed(1.0f)
+            }
+
             track.write(output, 0, output.size)
             track.play()
+            // Czas trwania odtwarzania = długość próbki (speed = 1.0 nie zmienia
+            // tempa; pitch rozciągany jest w czasie tak, by długość została).
             val durationMs = (output.size.toLong() * 1000L) / pcm.sampleRate.coerceAtLeast(1)
             delay(durationMs)
             if (activeTrack === track) {
@@ -77,22 +94,13 @@ class SamplePlayer(context: Context) {
         }
     }
 
-    private fun resampleAndScale(input: ShortArray, pitchRatio: Double, volume: Double): ShortArray {
-        val ratio = pitchRatio.coerceIn(0.25, 8.0)
+    private fun scaleVolume(input: ShortArray, volume: Double): ShortArray {
         val gain = volume.coerceIn(0.0, 1.0)
-        val inLen = input.size
-        if (inLen == 0) return ShortArray(0)
-        val outLen = (inLen / ratio).toInt().coerceAtLeast(1)
-        val out = ShortArray(outLen)
+        if (gain >= 1.0) return input
+        val out = ShortArray(input.size)
         val maxAbs = Short.MAX_VALUE.toDouble()
-        for (i in 0 until outLen) {
-            val srcPos = i * ratio
-            val idx = srcPos.toInt()
-            val frac = srcPos - idx
-            val a = input[idx.coerceIn(0, inLen - 1)].toDouble()
-            val b = input[(idx + 1).coerceIn(0, inLen - 1)].toDouble()
-            val interpolated = a + (b - a) * frac
-            val scaled = (interpolated * gain).coerceIn(-maxAbs, maxAbs)
+        for (i in input.indices) {
+            val scaled = (input[i].toDouble() * gain).coerceIn(-maxAbs, maxAbs)
             out[i] = scaled.toInt().toShort()
         }
         return out
@@ -121,7 +129,7 @@ class SamplePlayer(context: Context) {
                     .build()
             )
             .setBufferSizeInBytes(minBuffer)
-            .setTransferMode(AudioTrack.MODE_STATIC)
+            .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
     }
 
