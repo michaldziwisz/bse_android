@@ -59,7 +59,7 @@ class HelmForegroundService : Service() {
         )
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_compass)
-            .setContentTitle("BSE — odczyt aktywny")
+            .setContentTitle("Sterigo — odczyt aktywny")
             .setContentText("Aplikacja czyta dane z urządzenia BlueSeaEye.")
             .setContentIntent(contentIntent)
             .setOngoing(true)

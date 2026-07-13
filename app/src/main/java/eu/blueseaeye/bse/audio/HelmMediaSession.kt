@@ -16,7 +16,7 @@ import android.media.session.PlaybackState
  */
 class HelmMediaSession(context: Context, private val onToggle: () -> Unit) {
 
-    private val session = MediaSession(context.applicationContext, "BSE").apply {
+    private val session = MediaSession(context.applicationContext, "Sterigo").apply {
         setCallback(object : MediaSession.Callback() {
             override fun onPlay() = onToggle()
             override fun onPause() = onToggle()

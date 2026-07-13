@@ -74,7 +74,7 @@ fun HelmDashboardScreen(
                     val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE)
                         as android.content.ClipboardManager
                     clipboard.setPrimaryClip(
-                        android.content.ClipData.newPlainText("BSE — opis błędu", reason)
+                        android.content.ClipData.newPlainText("Sterigo — opis błędu", reason)
                     )
                 },
                 onDismiss = { monitor.clearCrashReason() }
