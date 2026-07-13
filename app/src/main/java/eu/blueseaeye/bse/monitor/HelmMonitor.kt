@@ -1,5 +1,6 @@
 package eu.blueseaeye.bse.monitor
 
+import eu.blueseaeye.bse.audio.SamplePlayer
 import eu.blueseaeye.bse.audio.TonePlayer
 import eu.blueseaeye.bse.audio.TtsSpeaker
 import eu.blueseaeye.bse.data.SettingsStore
@@ -47,6 +48,7 @@ class HelmMonitor(
     private val settingsStore: SettingsStore,
     private val apiClient: HelmApiClient,
     private val tonePlayer: TonePlayer,
+    private val samplePlayer: SamplePlayer,
     private val speaker: TtsSpeaker,
     private val onConnectionLostAlert: suspend (String) -> Unit = {},
     private val onConnectionRecovered: () -> Unit = {},
@@ -57,7 +59,6 @@ class HelmMonitor(
 
     private val statusIntervalMs = 500L
     private val loopDelayMs = 100L
-    private val frequencyMid = 440.0
     private val connectionAlertRepeatIntervalMs = 20_000L
 
     private var loopJob: Job? = null
@@ -92,6 +93,7 @@ class HelmMonitor(
         isSpeechActive = false
         speaker.stop()
         tonePlayer.stop()
+        samplePlayer.stop()
         settingsStore.readingActive = false
         _state.value = _state.value.copy(isPolling = false, isReadingEnabled = false)
     }
@@ -105,6 +107,7 @@ class HelmMonitor(
             isSpeechActive = false
             speaker.stop()
             tonePlayer.stop()
+            samplePlayer.stop()
         }
     }
 
@@ -327,22 +330,26 @@ class HelmMonitor(
 
             if (!(errorExceeded || settings.toneOnCourse || !onTarget)) return
 
-            // Ton właściwy: 100 ms (krótki). Ton referencyjny został usunięty na
-            // życzenie — sygnalizujemy wyłącznie ton odchyłki.
-            val mainToneDuration = 0.1
+            // Sygnał odchyłki gramy GOTOWĄ PRÓBKĄ dźwiękową zamiast syntezowanego
+            // tonu. Kierunek wybiera próbkę (l1 = w lewo / „lewiej”, r1 = w prawo /
+            // „prawiej”, 0 = na kursie), a WIELKOŚĆ odchyłki podnosi wysokość
+            // odtwarzanej próbki — dokładnie tak, jak wcześniej rósł ton.
+            val volume = settings.toneVolume / 100.0
 
             if (errorExceeded || (!onTarget && delta != 0.0)) {
                 val compensatedDelta = absoluteDelta - (if (onTarget) settings.errorThreshold else 0.0)
                 val severity = minOf(compensatedDelta, settings.errorRange)
-                val gain = if (delta > 0) 1.0 else -1.0
                 val multiplier = if (settings.broadTonalSpread) 2.0 else 1.0
                 val baseOffset = settings.toneBaseOffset / 12.0
-                val frequency = frequencyMid * 2.0.pow(
-                    gain * ((multiplier * severity / settings.errorRange) + baseOffset)
-                )
-                tonePlayer.play(frequency, mainToneDuration, settings.toneVolume / 100.0, settings.toneType)
+                // Ten sam wykładnik co dawniej dla wysokości tonu, ale ZAWSZE
+                // dodatni (w górę) — kierunek niesie już wybrana próbka.
+                val pitchRatio = 2.0.pow((multiplier * severity / settings.errorRange) + baseOffset)
+                // delta > 0 => „lewiej” (l1), delta < 0 => „prawiej” (r1).
+                val signal = if (delta > 0) SamplePlayer.Signal.LEFT else SamplePlayer.Signal.RIGHT
+                samplePlayer.play(signal, pitchRatio, volume)
             } else {
-                tonePlayer.play(frequencyMid, mainToneDuration, settings.toneVolume / 100.0, settings.toneType)
+                // Na kursie: próbka „0” w naturalnej wysokości.
+                samplePlayer.play(SamplePlayer.Signal.CENTER, 1.0, volume)
             }
         } finally {
             isSignalInProgress = false

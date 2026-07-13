@@ -1,6 +1,7 @@
 package eu.blueseaeye.bse
 
 import android.content.Context
+import eu.blueseaeye.bse.audio.SamplePlayer
 import eu.blueseaeye.bse.audio.TonePlayer
 import eu.blueseaeye.bse.audio.TtsSpeaker
 import eu.blueseaeye.bse.data.SettingsStore
@@ -20,6 +21,7 @@ class AppContainer(context: Context) {
     val settingsStore = SettingsStore(appContext)
     val speaker = TtsSpeaker(appContext)
     private val tonePlayer = TonePlayer()
+    private val samplePlayer = SamplePlayer(appContext)
     private val apiClient = HelmApiClient()
     val notifications = SafetyNotifications(appContext)
     val deviceNetworkBinder = DeviceNetworkBinder(appContext)
@@ -28,6 +30,7 @@ class AppContainer(context: Context) {
         settingsStore = settingsStore,
         apiClient = apiClient,
         tonePlayer = tonePlayer,
+        samplePlayer = samplePlayer,
         speaker = speaker,
         onConnectionLostAlert = { message ->
             notifications.scheduleConnectionLostAlert(
