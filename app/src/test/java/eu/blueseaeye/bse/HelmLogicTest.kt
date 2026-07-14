@@ -91,6 +91,15 @@ class HelmLogicTest {
     }
 
     @Test
+    fun spokenReadingSkipsRudderWhenDisabled() {
+        // Gdy użytkownik wyłączy odczyt wychylenia steru, wypowiedź zawiera
+        // samą wartość główną — bez części „Prawo/Lewo N".
+        val settings = AppSettings(target = TargetMode.NONE, announceRudderAngle = false)
+        val snapshot = HelmSnapshot(course = 90.0, rudder = -15.0, wind = null, fetchedAt = Date())
+        assertEquals("90", snapshot.spokenReading(settings))
+    }
+
+    @Test
     fun spokenReadingCourseUnknownWhenNoValue() {
         val settings = AppSettings(target = TargetMode.NONE)
         val snapshot = HelmSnapshot(course = null, rudder = null, wind = null, fetchedAt = Date())

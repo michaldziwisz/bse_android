@@ -34,6 +34,7 @@ data class AppSettings(
     val targetWind: Double? = null,
     val errorThreshold: Double = 1.0,
     val errorRange: Double = 30.0,
+    val announceRudderAngle: Boolean = true,
     val invertRudderAngle: Boolean = false,
     val rudderAngleCorrection: Double = 0.0,
     val autoResumeMode: AutoResumeMode = AutoResumeMode.NEVER,

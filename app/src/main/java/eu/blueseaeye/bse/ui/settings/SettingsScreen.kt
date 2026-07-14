@@ -193,6 +193,9 @@ private fun AdvancedSection(store: SettingsStore, settings: AppSettings) {
             Text("Zaawansowane")
         }
         if (expanded) {
+            ToggleRow("Odczytuj wychylenie steru", settings.announceRudderAngle) { v ->
+                store.update { it.copy(announceRudderAngle = v) }
+            }
             ToggleRow("Odwróć wychylenie steru", settings.invertRudderAngle) { v ->
                 store.update { it.copy(invertRudderAngle = v) }
             }

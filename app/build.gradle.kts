@@ -22,8 +22,8 @@ android {
         applicationId = "eu.blueseaeye.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.0.2"
+        versionCode = 9
+        versionName = "1.0.3"
 
         vectorDrawables {
             useSupportLibrary = true

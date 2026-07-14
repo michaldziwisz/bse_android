@@ -1,0 +1,4 @@
+Nowości w wersji 1.0.3:
+
+- Nowe, wyraźniejsze dźwięki sygnalizujące odchyłkę od kursu.
+- W ustawieniach zaawansowanych możesz teraz wyłączyć odczytywanie wychylenia steru, jeśli tych danych nie potrzebujesz.

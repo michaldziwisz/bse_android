@@ -89,9 +89,11 @@ data class HelmSnapshot(
                 TargetMode.WIND -> return ""
             }
         }
-        rudder?.let {
-            val side = if (it > 0) "Prawo" else "Lewo"
-            parts.add("$side ${abs(it.roundToInt())}")
+        if (settings.announceRudderAngle) {
+            rudder?.let {
+                val side = if (it > 0) "Prawo" else "Lewo"
+                parts.add("$side ${abs(it.roundToInt())}")
+            }
         }
         return parts.joinToString(", ")
     }
