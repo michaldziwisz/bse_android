@@ -1,0 +1,4 @@
+Nowości w wersji 1.0.4:
+
+- Naprawiono błąd, który na Androidzie 10 zamykał aplikację przy wejściu w Ustawienia.
+- W informacji o wcześniejszym zamknięciu aplikacji dodano przycisk „Wyślij maila do autora” — otwiera gotową wiadomość z opisem błędu, bez ręcznego wpisywania adresu.

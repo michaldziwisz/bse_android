@@ -5,7 +5,6 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -77,6 +76,31 @@ fun HelmDashboardScreen(
                         android.content.ClipData.newPlainText("Sterigo — opis błędu", reason)
                     )
                 },
+                onSendEmail = {
+                    // Otwiera klienta pocztowego z gotowym adresem, tematem i
+                    // wklejonym opisem błędu — testerowi (Android 10, uciążliwa
+                    // klawiatura) nie trzeba wpisywać adresu ręcznie. ACTION_SENDTO
+                    // z mailto: gwarantuje, że wybierze się wyłącznie appka poczty.
+                    val subject = "Sterigo (Android) — zgłoszenie błędu"
+                    val uri = Uri.parse(
+                        "mailto:" + CrashReportEmail.AUTHOR_ADDRESS +
+                            "?subject=" + Uri.encode(subject) +
+                            "&body=" + Uri.encode(reason)
+                    )
+                    val intent = Intent(Intent.ACTION_SENDTO, uri)
+                    try {
+                        context.startActivity(
+                            Intent.createChooser(intent, "Wyślij zgłoszenie mailem")
+                        )
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        // Brak klienta poczty — dajemy znać zamiast cichego crasha.
+                        android.widget.Toast.makeText(
+                            context,
+                            "Nie znaleziono aplikacji pocztowej. Opis błędu skopiuj przyciskiem obok.",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                },
                 onDismiss = { monitor.clearCrashReason() }
             )
         }
@@ -131,6 +155,7 @@ private fun ConnectionStatusLine(
 private fun CrashReportSection(
     reason: String,
     onCopy: () -> Unit,
+    onSendEmail: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var copied by remember { mutableStateOf(false) }
@@ -153,22 +178,32 @@ private fun CrashReportSection(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onTertiaryContainer
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = {
-                        onCopy()
-                        copied = true
-                    },
-                    modifier = Modifier.semanticButton("Kopiuj do schowka. Kopiuje pełny opis błędu, aby wkleić go w wiadomości.")
-                ) {
-                    Text("Kopiuj do schowka")
-                }
-                OutlinedButton(
-                    onClick = onDismiss,
-                    modifier = Modifier.semanticButton("OK, ukryj. Ukrywa informację o poprzednim zamknięciu aplikacji.")
-                ) {
-                    Text("OK, ukryj")
-                }
+            Button(
+                onClick = onSendEmail,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semanticButton("Wyślij maila do autora. Otwiera aplikację pocztową z gotowym adresem i wklejonym opisem błędu.")
+            ) {
+                Text("Wyślij maila do autora")
+            }
+            Button(
+                onClick = {
+                    onCopy()
+                    copied = true
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semanticButton("Kopiuj do schowka. Kopiuje pełny opis błędu, aby wkleić go w wiadomości.")
+            ) {
+                Text("Kopiuj do schowka")
+            }
+            OutlinedButton(
+                onClick = onDismiss,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semanticButton("OK, ukryj. Ukrywa informację o poprzednim zamknięciu aplikacji.")
+            ) {
+                Text("OK, ukryj")
             }
             if (copied) {
                 Text(
@@ -180,6 +215,11 @@ private fun CrashReportSection(
             }
         }
     }
+}
+
+/** Adres, na który trafiają zgłoszenia błędów z przycisku „Wyślij maila do autora”. */
+private object CrashReportEmail {
+    const val AUTHOR_ADDRESS = "michal@dziwisz.net"
 }
 
 @Composable

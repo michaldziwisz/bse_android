@@ -295,7 +295,15 @@ fun AdjustableSettingRow(
                         // kolejność „nazwa, wartość".
                         info.rangeInfo = null
                         info.contentDescription = ""
-                        info.stateDescription = "$label $current"
+                        // setStateDescription na platformowym AccessibilityNodeInfo
+                        // istnieje dopiero od API 30 (Android 11) — bezpośrednie
+                        // wywołanie wywalało apkę na Androidzie 10
+                        // (java.lang.NoSuchMethodError: no virtual method
+                        // setStateDescription). Kompatybilny wrapper na API≥30
+                        // ustawia natywnie, a na starszych zapisuje do extras,
+                        // skąd i tak czyta je TalkBack.
+                        androidx.core.view.accessibility.AccessibilityNodeInfoCompat
+                            .wrap(info).stateDescription = "$label $current"
                         // Przy wrap=true zawsze udostępniamy OBIE akcje przewijania,
                         // także na krańcach — inaczej AbsSeekBar usuwa
                         // SCROLL_FORWARD przy max i SCROLL_BACKWARD przy 0, więc
@@ -477,7 +485,9 @@ private fun CourseInputDialog(
 }
 
 private fun android.view.View.setStateDescriptionCompat(text: String) {
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-        androidx.core.view.ViewCompat.setStateDescription(this, text)
-    }
+    // ViewCompat.setStateDescription sam ogarnia wersję Androida: na API≥30
+    // ustawia natywnie, na starszych zapisuje do tagu widoku (skąd czyta AndroidX
+    // i przekazuje czytnikowi). Wcześniejszy guard „>= R” powodował, że na
+    // Androidzie 10 wartość suwaka nie była w ogóle ogłaszana.
+    androidx.core.view.ViewCompat.setStateDescription(this, text)
 }
