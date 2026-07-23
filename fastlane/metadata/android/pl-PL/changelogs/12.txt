@@ -1,0 +1,2 @@
+Zamieniono komendy głosowe: sygnał z prawej to teraz „lewiej”, z lewej „prawiej” (skręcasz w stronę przeciwną do dźwięku).
+Nowa opcja „Dźwięki w panoramie” — z obiema słuchawkami sygnał odchyłki słychać z odpowiedniej strony, a na kursie ze środka.

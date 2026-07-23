@@ -21,6 +21,7 @@ data class AppSettings(
     val readingVoiceIdentifier: String? = null,
     val readingVolume: Double = 100.0,
     val soundSignalsEnabled: Boolean = true,
+    val stereoPanning: Boolean = false,
     val toneDelay: Double = 1.0,
     val referenceTone: Boolean = true,
     val toneBaseOffset: Double = 2.0,

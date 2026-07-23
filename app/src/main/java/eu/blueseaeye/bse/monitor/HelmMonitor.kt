@@ -331,10 +331,17 @@ class HelmMonitor(
             if (!(errorExceeded || settings.toneOnCourse || !onTarget)) return
 
             // Sygnał odchyłki gramy GOTOWĄ PRÓBKĄ dźwiękową zamiast syntezowanego
-            // tonu. Kierunek wybiera próbkę (l1 = w lewo / „lewiej”, r1 = w prawo /
-            // „prawiej”, 0 = na kursie), a WIELKOŚĆ odchyłki podnosi wysokość
-            // odtwarzanej próbki — dokładnie tak, jak wcześniej rósł ton.
+            // tonu. Kierunek wybiera próbkę (l1 = sygnał z lewej strony, r1 =
+            // sygnał z prawej, 0 = na kursie), a WIELKOŚĆ odchyłki podnosi
+            // wysokość odtwarzanej próbki — dokładnie tak, jak wcześniej rósł ton.
+            // Uwaga: komenda głosowa jest w slangu żeglarskim ODWROTNA do strony
+            // sygnału (dźwięk z prawej => „lewiej”) — patrz HelmSnapshot.spokenReading.
             val volume = settings.toneVolume / 100.0
+            // Panorama próbek po kanałach (tylko dźwięki, nie synteza). Gdy
+            // włączona, sygnał „lewy” (l1) idzie w lewy kanał, „prawy” (r1) w
+            // prawy — po 25% w bok, środek zostaje na środku. Bez podłączonych
+            // obu słuchawek i tak brzmi jak dotąd.
+            val panMagnitude = if (settings.stereoPanning) 0.25 else 0.0
 
             if (errorExceeded || (!onTarget && delta != 0.0)) {
                 val compensatedDelta = absoluteDelta - (if (onTarget) settings.errorThreshold else 0.0)
@@ -344,12 +351,14 @@ class HelmMonitor(
                 // Ten sam wykładnik co dawniej dla wysokości tonu, ale ZAWSZE
                 // dodatni (w górę) — kierunek niesie już wybrana próbka.
                 val pitchRatio = 2.0.pow((multiplier * severity / settings.errorRange) + baseOffset)
-                // delta > 0 => „lewiej” (l1), delta < 0 => „prawiej” (r1).
+                // delta > 0 => „lewiej” (l1, w lewy kanał), delta < 0 => „prawiej”
+                // (r1, w prawy kanał).
                 val signal = if (delta > 0) SamplePlayer.Signal.LEFT else SamplePlayer.Signal.RIGHT
-                samplePlayer.play(signal, pitchRatio, volume)
+                val pan = if (delta > 0) -panMagnitude else panMagnitude
+                samplePlayer.play(signal, pitchRatio, volume, pan)
             } else {
-                // Na kursie: próbka „0” w naturalnej wysokości.
-                samplePlayer.play(SamplePlayer.Signal.CENTER, 1.0, volume)
+                // Na kursie: próbka „0” w naturalnej wysokości, na środku.
+                samplePlayer.play(SamplePlayer.Signal.CENTER, 1.0, volume, 0.0)
             }
         } finally {
             isSignalInProgress = false

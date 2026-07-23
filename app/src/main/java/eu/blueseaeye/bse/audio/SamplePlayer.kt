@@ -63,11 +63,19 @@ class SamplePlayer(context: Context) {
      * Odtwarza wskazaną próbkę [signal] z zadaną wysokością ([pitchRatio], 1.0 =
      * naturalna wysokość, 2.0 = oktawa wyżej) i głośnością [volume] (0.0–1.0).
      * Długość i tempo próbki pozostają bez zmian — zmienia się wyłącznie wysokość.
+     *
+     * [pan] rozrzuca dźwięk po kanałach stereo: 0.0 = środek, wartość ujemna =
+     * bardziej w lewo, dodatnia = bardziej w prawo (zakres -1.0…1.0, gdzie ±1.0
+     * to skrajna strona). Realizujemy to przyciszając kanał przeciwny do strony
+     * (mono próbka trafia do obu kanałów, a [android.media.AudioTrack.setStereoVolume]
+     * nadaje im różne wzmocnienia). Dzięki temu z podłączonymi obiema słuchawkami
+     * sygnał „lewy” słychać bardziej po lewej, a „prawy” po prawej.
      */
     suspend fun play(
         signal: Signal,
         pitchRatio: Double,
-        volume: Double
+        volume: Double,
+        pan: Double = 0.0
     ) = withContext(Dispatchers.Default) {
         try {
             val pcm = load(signal)
@@ -83,6 +91,18 @@ class SamplePlayer(context: Context) {
             }
             val track = buildTrack(pcm.sampleRate, output.size)
             activeTrack = track
+
+            // Panorama: mono próbka trafia do obu kanałów, różne wzmocnienia lewego
+            // i prawego przesuwają dźwięk w bok. pan<0 => ciszej po prawej (dźwięk
+            // po lewej), pan>0 => ciszej po lewej. |pan| do 1.0 = skrajna strona.
+            val clampedPan = pan.coerceIn(-1.0, 1.0)
+            if (clampedPan != 0.0) {
+                val leftGain = (if (clampedPan > 0) 1.0 - clampedPan else 1.0).toFloat().coerceIn(0f, 1f)
+                val rightGain = (if (clampedPan < 0) 1.0 + clampedPan else 1.0).toFloat().coerceIn(0f, 1f)
+                @Suppress("DEPRECATION")
+                runCatching { track.setStereoVolume(leftGain, rightGain) }
+                    .onFailure { Log.w(TAG, "play($signal): setStereoVolume nieudane: ${it.message}") }
+            }
 
             val written = track.write(output, 0, output.size)
             if (written < 0) {

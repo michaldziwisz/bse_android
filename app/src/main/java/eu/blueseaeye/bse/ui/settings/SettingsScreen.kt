@@ -142,6 +142,14 @@ private fun ToneSection(store: SettingsStore, settings: AppSettings) {
         ToggleRow("Odtwarzaj sygnały dźwiękowe", settings.soundSignalsEnabled) { v ->
             store.update { it.copy(soundSignalsEnabled = v) }
         }
+        ToggleRow("Dźwięki w panoramie", settings.stereoPanning) { v ->
+            store.update { it.copy(stereoPanning = v) }
+        }
+        Text(
+            text = "Gdy włączone i masz podłączone obie słuchawki, sygnał odchyłki w lewo słychać bardziej z lewej strony, a w prawo z prawej (po 25% w bok). Sygnał na kursie pozostaje na środku. Dotyczy tylko dźwięków sygnału, nie mowy.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         ToggleRow("Odtwarzaj ton na zadanym kursie", settings.toneOnCourse) { v ->
             store.update { it.copy(toneOnCourse = v) }
         }

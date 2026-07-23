@@ -71,12 +71,14 @@ data class HelmSnapshot(
         val value = displayedValue(settings)
         if (value != null) {
             if (settings.target == TargetMode.COURSE) {
-                // Odchyłka od zadanego kursu: ujemna = trzeba iść prawiej,
-                // dodatnia = lewiej (na życzenie użytkownika, zamiast liczby ze
-                // znakiem). Zero = na kursie.
+                // Odchyłka od zadanego kursu. Komenda dla sternika jest w slangu
+                // żeglarskim ODWROTNA do strony, z której odzywa się sygnał
+                // dźwiękowy: sygnał z prawej (wartość < 0, próbka r1) => skręcaj w
+                // lewo => „lewiej”; sygnał z lewej (wartość > 0, próbka l1) =>
+                // skręcaj w prawo => „prawiej”. Zero = na kursie.
                 val direction = when {
-                    value < 0 -> "prawiej ${abs(value)}"
-                    value > 0 -> "lewiej $value"
+                    value < 0 -> "lewiej ${abs(value)}"
+                    value > 0 -> "prawiej $value"
                     else -> "0"
                 }
                 parts.add(direction)
