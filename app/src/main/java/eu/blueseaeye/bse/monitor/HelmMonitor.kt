@@ -339,9 +339,9 @@ class HelmMonitor(
             val volume = settings.toneVolume / 100.0
             // Panorama próbek po kanałach (tylko dźwięki, nie synteza). Gdy
             // włączona, sygnał „lewy” (l1) idzie w lewy kanał, „prawy” (r1) w
-            // prawy — po 25% w bok, środek zostaje na środku. Bez podłączonych
+            // prawy — po 50% w bok, środek zostaje na środku. Bez podłączonych
             // obu słuchawek i tak brzmi jak dotąd.
-            val panMagnitude = if (settings.stereoPanning) 0.25 else 0.0
+            val panMagnitude = if (settings.stereoPanning) 0.5 else 0.0
 
             if (errorExceeded || (!onTarget && delta != 0.0)) {
                 val compensatedDelta = absoluteDelta - (if (onTarget) settings.errorThreshold else 0.0)
