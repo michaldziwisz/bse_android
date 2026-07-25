@@ -146,7 +146,7 @@ private fun ToneSection(store: SettingsStore, settings: AppSettings) {
             store.update { it.copy(stereoPanning = v) }
         }
         Text(
-            text = "Gdy włączone i masz podłączone obie słuchawki, sygnał odchyłki w lewo słychać bardziej z lewej strony, a w prawo z prawej (po 25% w bok). Sygnał na kursie pozostaje na środku. Dotyczy tylko dźwięków sygnału, nie mowy.",
+            text = "Gdy włączone i masz podłączone obie słuchawki, sygnał odchyłki w lewo słychać bardziej z lewej strony, a w prawo z prawej (po 50% w bok). Sygnał na kursie pozostaje na środku. Dotyczy tylko dźwięków sygnału, nie mowy.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
