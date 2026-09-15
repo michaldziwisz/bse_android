@@ -4,6 +4,7 @@ import eu.blueseaeye.bse.audio.SamplePlayer
 import eu.blueseaeye.bse.audio.TonePlayer
 import eu.blueseaeye.bse.audio.TtsSpeaker
 import eu.blueseaeye.bse.data.SettingsStore
+import eu.blueseaeye.bse.model.AdminFailureMessages
 import eu.blueseaeye.bse.model.AdministrationAction
 import eu.blueseaeye.bse.model.AppSettings
 import eu.blueseaeye.bse.model.AutoResumeMode
@@ -36,6 +37,8 @@ data class MonitorState(
     val lastAnnouncement: String = "",
     val errorMessage: String? = null,
     val adminMessage: String? = null,
+    /** Czy [adminMessage] to komunikat o błędzie (steruje kolorem i tonem linii). */
+    val adminIsError: Boolean = false,
     val isBusy: Boolean = false,
     val lastCrashReason: String? = null
 )
@@ -166,7 +169,7 @@ class HelmMonitor(
     }
 
     fun clearAdminMessage() {
-        _state.value = _state.value.copy(adminMessage = null)
+        _state.value = _state.value.copy(adminMessage = null, adminIsError = false)
     }
 
     fun runAdministrationAction(action: AdministrationAction) {
@@ -178,14 +181,24 @@ class HelmMonitor(
                     AdministrationAction.CALIBRATE -> "Kalibracja uruchomiona."
                     AdministrationAction.REBOOT -> "Urządzenie rozpoczyna restart."
                 }
-                _state.value = _state.value.copy(adminMessage = message)
+                _state.value = _state.value.copy(adminMessage = message, adminIsError = false)
             } catch (e: Exception) {
-                _state.value = _state.value.copy(adminMessage = e.message ?: "Błąd akcji.")
+                _state.value = _state.value.copy(
+                    adminMessage = AdminFailureMessages.describe(action, e, settings.demoMode),
+                    adminIsError = true
+                )
             } finally {
                 _state.value = _state.value.copy(isBusy = false)
             }
         }
     }
+
+    /**
+     * Zamienia błąd czynności na zdanie zrozumiałe dla użytkownika.
+     * Logika mieszka w [AdminFailureMessages] (czysta funkcja, testowana w JVM).
+     */
+    private fun describeAdminFailure(action: AdministrationAction, error: Exception): String =
+        AdminFailureMessages.describe(action, error, settings.demoMode)
 
     private suspend fun runLoop() {
         while (scope.isActive && loopJob?.isActive == true) {

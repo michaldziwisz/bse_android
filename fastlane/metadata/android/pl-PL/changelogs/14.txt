@@ -1,0 +1,5 @@
+Kalibracja żyroskopu i restart urządzenia pokazują teraz wynik na ekranie Ustawień, a czytnik ekranu odczytuje go sam. Wcześniej po potwierdzeniu nic się nie odzywało i nie było wiadomo, czy polecenie doszło.
+
+Gdy urządzenie ma starsze oprogramowanie bez kalibracji albo pracuje tryb demonstracyjny, aplikacja mówi o tym wprost, zamiast pokazywać kod błędu.
+
+W trakcie wysyłania polecenia widać komunikat, a przycisk potwierdzenia jest chwilowo nieaktywny.

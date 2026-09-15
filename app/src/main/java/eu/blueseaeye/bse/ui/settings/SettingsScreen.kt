@@ -25,10 +25,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
@@ -222,19 +225,77 @@ private fun AdvancedSection(store: SettingsStore, settings: AppSettings) {
 
 @Composable
 private fun DeviceActionsSection(monitor: HelmMonitor) {
+    val monitorState by monitor.state.collectAsStateWithLifecycle()
     SettingsSection("Czynności urządzenia") {
         ConfirmableActionRow(
             title = "Kalibracja żyroskopu",
             warning = "Kalibrację żyroskopu należy przeprowadzić po ostatecznym zamocowaniu urządzenia do stałej części statku i gdy statek jest stabilny. Najlepiej w porcie na cumach.",
             confirmLabel = "Kalibruj",
+            enabled = !monitorState.isBusy,
             onConfirm = { monitor.runAdministrationAction(AdministrationAction.CALIBRATE) }
         )
         ConfirmableActionRow(
             title = "Restart urządzenia",
             warning = "Urządzenie uruchomi się ponownie. Po restarcie zwykle łączy się z powrotem samo. Jeśli w pobliżu jest inna zapamiętana sieć Wi-Fi, ponownie włącz odczyt na ekranie Ster, aby aplikacja wróciła do sieci „BlueSeaEye”.",
             confirmLabel = "Restart",
+            enabled = !monitorState.isBusy,
             onConfirm = { monitor.runAdministrationAction(AdministrationAction.REBOOT) }
         )
+        // Wynik czynności MUSI być widoczny (i odczytany) na TYM ekranie. Wcześniej
+        // komunikat lądował tylko na ukrytym ekranie Administracja, więc kalibracja
+        // i restart działały bez żadnego potwierdzenia — użytkownik czytnika ekranu
+        // nie wiedział, czy akcja się udała, czy sprzęt odpowiedział błędem.
+        DeviceActionStatusLine(
+            message = when {
+                monitorState.isBusy -> "Wysyłanie polecenia do urządzenia..."
+                else -> monitorState.adminMessage
+            },
+            isError = !monitorState.isBusy && monitorState.adminIsError,
+            onDismiss = { monitor.clearAdminMessage() },
+            dismissible = !monitorState.isBusy && monitorState.adminMessage != null
+        )
+    }
+}
+
+/**
+ * Linia wyniku czynności urządzenia. Wzorzec jak linia statusu połączenia na
+ * ekranie Ster: liveRegion Polite, żeby czytnik ekranu ogłosił zmianę sam,
+ * bez szukania komunikatu przez użytkownika.
+ */
+@Composable
+private fun DeviceActionStatusLine(
+    message: String?,
+    isError: Boolean,
+    dismissible: Boolean,
+    onDismiss: () -> Unit
+) {
+    if (message == null) return
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = if (isError) MaterialTheme.colorScheme.errorContainer
+        else MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (isError) MaterialTheme.colorScheme.onErrorContainer
+                else MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }
+            )
+            if (dismissible) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.semanticButton("Ukryj komunikat")
+                ) {
+                    Text("Ukryj komunikat")
+                }
+            }
+        }
     }
 }
 
@@ -243,6 +304,7 @@ private fun ConfirmableActionRow(
     title: String,
     warning: String,
     confirmLabel: String,
+    enabled: Boolean = true,
     onConfirm: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -266,6 +328,7 @@ private fun ConfirmableActionRow(
                     onConfirm()
                     expanded = false
                 },
+                enabled = enabled,
                 modifier = Modifier.semanticButton("$confirmLabel. $warning")
             ) {
                 Text(confirmLabel)
